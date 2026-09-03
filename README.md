@@ -129,7 +129,3 @@ The Logs page shows timestamped `DEBUG`, `INFO`, `WARNING`, `ERROR`, and success
 - **Invalid ZIP:** verify that the archive is readable and contains `.lua` or `.manifest` files. Unsafe paths inside ZIP files are rejected.
 - **No library entries:** the visual library is based on numeric `.lua` filenames in `<Steam>\config\lua`.
 - **Drag and drop unavailable:** reinstall dependencies from `requirements.txt`; file browsing remains available as a fallback.
-
-## Credits
-
-The underlying file behavior is a clean-room Python port of the previously documented Project Lightning / Lightning Tools workflow. Steam names and artwork are resolved through official Steam endpoints when available. The bundled logo is supplied with this project.
