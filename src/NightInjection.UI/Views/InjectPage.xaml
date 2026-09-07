@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Name="RootPage"
+    x:Class="NightInjection.UI.Views.InjectPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer>
+        <StackPanel Padding="{StaticResource PagePadding}" Spacing="18">
+            <StackPanel><TextBlock Text="Inject safely" Style="{StaticResource PageTitleStyle}"/>
+                <TextBlock Text="Build and review a deterministic plan before any Steam files are changed." Style="{StaticResource SecondaryTextStyle}"/></StackPanel>
+            <InfoBar IsOpen="{Binding HasStatus}" Message="{Binding StatusMessage}" IsClosable="False" Severity="Informational"/>
+            <ProgressBar IsIndeterminate="True" Visibility="{Binding IsBusy}"/>
+
+            <Border x:Name="DropZone" Style="{StaticResource CardStyle}" Background="{ThemeResource DropZoneBackgroundBrush}"
+                    BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="2" AllowDrop="True"
+                    DragOver="OnDragOver" Drop="OnDrop">
+                <StackPanel HorizontalAlignment="Center" Spacing="10" Padding="24">
+                    <FontIcon Glyph="&#xE898;" FontSize="32"/>
+                    <TextBlock Text="Drop .lua, .manifest, or .zip files here" Style="{StaticResource SectionTitleStyle}" TextAlignment="Center"/>
+                    <TextBlock Text="ZIP archives are validated for traversal, links, duplicates, expansion size, and compression ratio." Style="{StaticResource SecondaryTextStyle}" TextAlignment="Center"/>
+                    <Button HorizontalAlignment="Center" Command="{Binding BrowseCommand}" Style="{StaticResource AccentToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE8B7;"/><TextBlock Text="Browse files"/></StackPanel></Button>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource CardStyle}"><StackPanel Spacing="12">
+                <Grid><StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE8B7;"/><TextBlock Text="Selected files" Style="{StaticResource SectionTitleStyle}"/></StackPanel>
+                    <Button HorizontalAlignment="Right" Command="{Binding ClearFilesCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE74D;" FontSize="14"/><TextBlock Text="Clear"/></StackPanel></Button></Grid>
+                <ListView ItemsSource="{Binding Files}" SelectionMode="None" MaxHeight="260">
+                    <ListView.ItemTemplate><DataTemplate><Grid Padding="4,7" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="80"/><ColumnDefinition Width="90"/><ColumnDefinition Width="130"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                        <StackPanel><TextBlock Text="{Binding Name}" Style="{StaticResource BodyStrongTextBlockStyle}"/><TextBlock Text="{Binding Path}" Style="{StaticResource CaptionTextBlockStyle}" TextTrimming="CharacterEllipsis"/></StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding Type}" VerticalAlignment="Center"/><TextBlock Grid.Column="2" Text="{Binding Size}" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="3" Text="{Binding Validation}" VerticalAlignment="Center"/>
+                        <Button Grid.Column="4" Command="{Binding DataContext.RemoveFileCommand, ElementName=RootPage}" CommandParameter="{Binding}" Style="{StaticResource IconButtonStyle}" AutomationProperties.Name="Remove file"><FontIcon Glyph="&#xE74D;"/></Button>
+                    </Grid></DataTemplate></ListView.ItemTemplate>
+                </ListView>
+                <StackPanel Orientation="Horizontal" Spacing="12"><ToggleSwitch Header="Dry Run" IsOn="{Binding IsDryRun, Mode=TwoWay}" OnContent="No writes" OffContent="Writes enabled"/>
+                    <Button VerticalAlignment="Bottom" Command="{Binding BuildFilePlanCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE890;"/><TextBlock Text="Preview plan"/></StackPanel></Button>
+                    <Button VerticalAlignment="Bottom" Command="{Binding InjectFilesCommand}" Style="{StaticResource AccentToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE898;"/><TextBlock Text="Inject selected files"/></StackPanel></Button></StackPanel>
+            </StackPanel></Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

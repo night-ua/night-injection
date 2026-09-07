@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="NightInjection.UI.Views.DashboardPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Padding="{StaticResource PagePadding}" Spacing="20">
+            <Grid>
+                <StackPanel>
+                    <TextBlock Text="Welcome back" Style="{StaticResource PageTitleStyle}" />
+                    <TextBlock Text="Steam configuration health and recent activity at a glance." Style="{StaticResource SecondaryTextStyle}" />
+                </StackPanel>
+                <Button HorizontalAlignment="Right" VerticalAlignment="Center" Command="{Binding RefreshCommand}" Style="{StaticResource ToolbarButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE72C;"/><TextBlock Text="Refresh"/></StackPanel>
+                </Button>
+            </Grid>
+            <InfoBar IsOpen="{Binding HasStatus}" Message="{Binding StatusMessage}" IsClosable="False" />
+            <ProgressBar IsIndeterminate="True" Visibility="{Binding IsBusy}" />
+
+            <VariableSizedWrapGrid Orientation="Horizontal" ItemWidth="230" ItemHeight="145">
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,12,12">
+                    <StackPanel Spacing="8"><FontIcon Glyph="&#xE7FC;" HorizontalAlignment="Left"/><TextBlock Text="Steam" Style="{StaticResource CaptionTextBlockStyle}"/>
+                        <TextBlock Text="{Binding SteamStatus}" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap"/><TextBlock Text="{Binding SteamPath}" Style="{StaticResource SecondaryTextStyle}" MaxLines="2" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,12,12"><StackPanel Spacing="8"><FontIcon Glyph="&#xE8F1;" HorizontalAlignment="Left"/><TextBlock Text="Library items" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="{Binding LibraryCount}" Style="{StaticResource TitleTextBlockStyle}"/></StackPanel></Border>
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,12,12"><StackPanel Spacing="8"><FontIcon Glyph="&#xE81C;" HorizontalAlignment="Left"/><TextBlock Text="Processed records" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="{Binding ProcessedCount}" Style="{StaticResource TitleTextBlockStyle}"/></StackPanel></Border>
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,12,12"><StackPanel Spacing="8"><FontIcon Glyph="&#xE950;" HorizontalAlignment="Left"/><TextBlock Text="Artwork cache" Style="{StaticResource CaptionTextBlockStyle}"/><TextBlock Text="{Binding CacheSummary}" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap"/></StackPanel></Border>
+            </VariableSizedWrapGrid>
+
+            <Grid x:Name="ActivityGrid" ColumnSpacing="16">
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <Grid.ColumnDefinitions><ColumnDefinition x:Name="PrimaryColumn" Width="2*"/><ColumnDefinition x:Name="SecondaryColumn" Width="*"/></Grid.ColumnDefinitions>
+                <VisualStateManager.VisualStateGroups>
+                    <VisualStateGroup>
+                        <VisualState x:Name="NarrowLayout">
+                            <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="0"/></VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Target="PrimaryColumn.Width" Value="*"/>
+                                <Setter Target="SecondaryColumn.Width" Value="0"/>
+                                <Setter Target="QuickActionsCard.(Grid.Column)" Value="0"/>
+                                <Setter Target="QuickActionsCard.(Grid.Row)" Value="1"/>
+                                <Setter Target="QuickActionsCard.Margin" Value="0,16,0,0"/>
+                            </VisualState.Setters>
+                        </VisualState>
+                        <VisualState x:Name="WideLayout">
+                            <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="1050"/></VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Target="PrimaryColumn.Width" Value="2*"/>
+                                <Setter Target="SecondaryColumn.Width" Value="*"/>
+                                <Setter Target="QuickActionsCard.(Grid.Column)" Value="1"/>
+                                <Setter Target="QuickActionsCard.(Grid.Row)" Value="0"/>
+                                <Setter Target="QuickActionsCard.Margin" Value="0"/>
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
+                <Border Style="{StaticResource CardStyle}"><StackPanel Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE81C;"/><TextBlock Text="Recent operations" Style="{StaticResource SectionTitleStyle}"/></StackPanel>
+                    <ListView ItemsSource="{Binding RecentOperations}" SelectionMode="None" MaxHeight="330">
+                        <ListView.ItemTemplate><DataTemplate><Grid Padding="4,9" ColumnSpacing="10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="155"/><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/><ColumnDefinition Width="90"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Timestamp}"/><TextBlock Grid.Column="1" Text="{Binding Operation}"/><TextBlock Grid.Column="2" Text="{Binding SourceFile}" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="3" Text="{Binding Result}"/>
+                        </Grid></DataTemplate></ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel></Border>
+                <Border x:Name="QuickActionsCard" Grid.Column="1" Style="{StaticResource CardStyle}"><StackPanel Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE945;"/><TextBlock Text="Quick actions" Style="{StaticResource SectionTitleStyle}"/></StackPanel>
+                    <Button Command="{Binding NavigateCommand}" CommandParameter="Inject" Style="{StaticResource WideActionButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE898;"/><TextBlock Text="Inject files"/></StackPanel></Button>
+                    <Button Command="{Binding NavigateCommand}" CommandParameter="Library" Style="{StaticResource WideActionButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE8F1;"/><TextBlock Text="Open library"/></StackPanel></Button>
+                    <Button Command="{Binding NavigateCommand}" CommandParameter="Settings" Style="{StaticResource WideActionButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="10"><FontIcon Glyph="&#xE713;"/><TextBlock Text="Verify Steam"/></StackPanel></Button>
+                </StackPanel></Border>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

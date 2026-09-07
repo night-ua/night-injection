@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="NightInjection.UI.Views.HistoryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Padding="{StaticResource PagePadding}" RowSpacing="14">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Grid><StackPanel><TextBlock Text="History" Style="{StaticResource PageTitleStyle}"/><TextBlock Text="Auditable injection and removal activity stored locally in SQLite." Style="{StaticResource SecondaryTextStyle}"/></StackPanel>
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal" Spacing="8"><Button Command="{Binding ExportCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xEDE1;"/><TextBlock Text="Export CSV"/></StackPanel></Button><Button Command="{Binding ClearCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE74D;"/><TextBlock Text="Clear history"/></StackPanel></Button></StackPanel></Grid>
+        <Grid Grid.Row="1" ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="190"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <AutoSuggestBox PlaceholderText="Search operation, AppID, file, or details" Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" QueryIcon="Find"/>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding ResultFilters}" SelectedItem="{Binding ResultFilter, Mode=TwoWay}"/>
+            <Button Grid.Column="2" Command="{Binding RefreshCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE72C;"/><TextBlock Text="Apply"/></StackPanel></Button>
+        </Grid>
+        <InfoBar Grid.Row="2" IsOpen="{Binding HasStatus}" Message="{Binding StatusMessage}" IsClosable="False"/>
+        <Border Grid.Row="3" Style="{StaticResource CardStyle}" Padding="8">
+            <ListView ItemsSource="{Binding Records}" SelectionMode="None">
+                <ListView.Header><Grid Padding="12,8" ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="110"/><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="Timestamp" Style="{StaticResource BodyStrongTextBlockStyle}"/><TextBlock Grid.Column="1" Text="Operation" Style="{StaticResource BodyStrongTextBlockStyle}"/><TextBlock Grid.Column="2" Text="AppID" Style="{StaticResource BodyStrongTextBlockStyle}"/><TextBlock Grid.Column="3" Text="File / details" Style="{StaticResource BodyStrongTextBlockStyle}"/><TextBlock Grid.Column="4" Text="Result" Style="{StaticResource BodyStrongTextBlockStyle}"/>
+                </Grid></ListView.Header>
+                <ListView.ItemTemplate><DataTemplate><Grid Padding="4,8" ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="170"/><ColumnDefinition Width="110"/><ColumnDefinition Width="90"/><ColumnDefinition Width="*"/><ColumnDefinition Width="100"/></Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Timestamp}"/><TextBlock Grid.Column="1" Text="{Binding Operation}"/><TextBlock Grid.Column="2" Text="{Binding AppId}"/>
+                    <StackPanel Grid.Column="3"><TextBlock Text="{Binding SourceFile}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Details}" Style="{StaticResource CaptionTextBlockStyle}" TextTrimming="CharacterEllipsis"/></StackPanel><TextBlock Grid.Column="4" Text="{Binding Result}"/>
+                </Grid></DataTemplate></ListView.ItemTemplate>
+            </ListView>
+        </Border>
+    </Grid>
+</Page>

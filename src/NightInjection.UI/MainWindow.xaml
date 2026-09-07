@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="NightInjection.UI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="Night Injection"
+    mc:Ignorable="d">
+    <Window.SystemBackdrop>
+        <MicaBackdrop Kind="BaseAlt" />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="RootLayout" Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TitleBar
+            x:Name="AppTitleBar"
+            Background="Transparent"
+            Title="Night Injection"
+            Subtitle="Steam configuration toolkit">
+            <TitleBar.IconSource>
+                <BitmapIconSource UriSource="ms-appx:///Assets/AppIconMaster.png" ShowAsMonochrome="False" />
+            </TitleBar.IconSource>
+        </TitleBar>
+        <NavigationView
+            x:Name="Navigation"
+            Grid.Row="1"
+            IsBackButtonVisible="Collapsed"
+            IsPaneToggleButtonVisible="True"
+            IsSettingsVisible="True"
+            OpenPaneLength="236"
+            Background="Transparent"
+            PaneDisplayMode="Auto"
+            SelectionChanged="OnNavigationSelectionChanged">
+            <NavigationView.PaneHeader>
+                <StackPanel Margin="8,8,0,12" Orientation="Horizontal" Spacing="10">
+                    <Border Width="36" Height="36" CornerRadius="10" Background="{ThemeResource BrandIconBackgroundBrush}">
+                        <Image Source="Assets/AppIconMaster.png" Margin="5" Stretch="Uniform" />
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Night Injection" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <TextBlock Text="STEAM TOOLKIT" Style="{StaticResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </StackPanel>
+            </NavigationView.PaneHeader>
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="Dashboard" Tag="Dashboard">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE80F;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Inject" Tag="Inject">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE898;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Library" Tag="Library">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8F1;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="History" Tag="History">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE81C;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem Content="Logs" Tag="Logs">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE9D9;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+            <NavigationView.Header>
+                <TextBlock x:Name="PageHeader" Style="{StaticResource TitleTextBlockStyle}" />
+            </NavigationView.Header>
+            <Frame x:Name="PageFrame" Background="Transparent" />
+        </NavigationView>
+    </Grid>
+</Window>

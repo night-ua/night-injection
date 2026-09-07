@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishAot>false</PublishAot>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <OptimizationPreference>Size</OptimizationPreference>
+    <AssemblyName>NightInjection-Setup</AssemblyName>
+    <RootNamespace>NightInjection.Setup</RootNamespace>
+    <ApplicationIcon>..\..\src\NightInjection.UI\Assets\AppIcon.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DebugType>none</DebugType>
+    <Version>1.1.0</Version>
+    <Product>Night Injection Setup</Product>
+    <Company>Night Injection</Company>
+    <Description>Per-user installer for Night Injection</Description>
+    <Copyright>Night Injection contributors</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(InstallerPayload)' != ''">
+    <EmbeddedResource Include="$(InstallerPayload)" LogicalName="NightInjection.Payload.zip" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(UninstallerPayload)' != ''">
+    <EmbeddedResource Include="$(UninstallerPayload)" LogicalName="NightInjection.Uninstaller.exe" />
+  </ItemGroup>
+
+  <Target Name="ValidateInstallerPayload" BeforeTargets="PrepareForPublish">
+    <Error Condition="'$(InstallerPayload)' == ''" Text="InstallerPayload must point to NightInjection-Portable.zip." />
+    <Error Condition="'$(InstallerPayload)' != '' and !Exists('$(InstallerPayload)')" Text="InstallerPayload does not exist: $(InstallerPayload)" />
+    <Error Condition="'$(UninstallerPayload)' == ''" Text="UninstallerPayload must point to the published Uninstall.exe." />
+    <Error Condition="'$(UninstallerPayload)' != '' and !Exists('$(UninstallerPayload)')" Text="UninstallerPayload does not exist: $(UninstallerPayload)" />
+  </Target>
+</Project>

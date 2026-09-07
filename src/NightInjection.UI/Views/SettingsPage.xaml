@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="NightInjection.UI.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls">
+    <ScrollViewer>
+        <StackPanel Padding="{StaticResource PagePadding}" Spacing="18" MaxWidth="980" HorizontalAlignment="Stretch">
+            <StackPanel><TextBlock Text="Settings" Style="{StaticResource PageTitleStyle}"/><TextBlock Text="Preferences are persisted atomically in settings.json." Style="{StaticResource SecondaryTextStyle}"/></StackPanel>
+            <InfoBar IsOpen="{Binding HasStatus}" Message="{Binding StatusMessage}" IsClosable="False"/>
+
+            <toolkit:SettingsExpander Header="Steam" Description="Installation detection and verification" IsExpanded="True">
+                <toolkit:SettingsExpander.HeaderIcon><FontIcon Glyph="&#xE7FC;"/></toolkit:SettingsExpander.HeaderIcon>
+                <toolkit:SettingsExpander.Items>
+                    <toolkit:SettingsCard Header="Steam installation path" Description="The folder that directly contains steam.exe">
+                        <toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE838;"/></toolkit:SettingsCard.HeaderIcon>
+                        <Grid MinWidth="280" MaxWidth="520" HorizontalAlignment="Stretch" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBox Text="{Binding SteamPath, Mode=TwoWay}" PlaceholderText="C:\Program Files (x86)\Steam"/>
+                            <Button Grid.Column="1" Command="{Binding BrowseSteamCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE8B7;"/><TextBlock Text="Browse"/></StackPanel></Button>
+                        </Grid>
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard Header="Verify Steam" Description="Checks the configured folder without modifying it">
+                        <toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE73E;"/></toolkit:SettingsCard.HeaderIcon>
+                        <StackPanel Orientation="Horizontal" Spacing="8"><Button Command="{Binding VerifySteamCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE73E;"/><TextBlock Text="Verify"/></StackPanel></Button><Button Command="{Binding DetectSteamCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE721;"/><TextBlock Text="Auto detect"/></StackPanel></Button></StackPanel>
+                    </toolkit:SettingsCard>
+                </toolkit:SettingsExpander.Items>
+            </toolkit:SettingsExpander>
+
+            <toolkit:SettingsExpander Header="Appearance and behavior" Description="Native theme, motion, and window preferences">
+                <toolkit:SettingsExpander.HeaderIcon><FontIcon Glyph="&#xE790;"/></toolkit:SettingsExpander.HeaderIcon>
+                <toolkit:SettingsExpander.Items>
+                    <toolkit:SettingsCard Header="Theme" Description="Follow Windows or choose a fixed theme">
+                        <toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE771;"/></toolkit:SettingsCard.HeaderIcon>
+                        <ComboBox Width="180" ItemsSource="{Binding Themes}" SelectedItem="{Binding Theme, Mode=TwoWay}"/>
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard Header="Animations" Description="Enable subtle interface motion"><toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE7FC;"/></toolkit:SettingsCard.HeaderIcon><ToggleSwitch IsOn="{Binding AnimationsEnabled, Mode=TwoWay}"/></toolkit:SettingsCard>
+                    <toolkit:SettingsCard Header="Remember window size" Description="Restore the previous dimensions and maximized state"><toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8A7;"/></toolkit:SettingsCard.HeaderIcon><ToggleSwitch IsOn="{Binding RememberWindowSize, Mode=TwoWay}"/></toolkit:SettingsCard>
+                    <toolkit:SettingsCard Header="Auto-scroll logs" Description="Keep the latest visible event in view"><toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE9D9;"/></toolkit:SettingsCard.HeaderIcon><ToggleSwitch IsOn="{Binding AutoScrollLogs, Mode=TwoWay}"/></toolkit:SettingsCard>
+                </toolkit:SettingsExpander.Items>
+            </toolkit:SettingsExpander>
+
+            <toolkit:SettingsExpander Header="Data and diagnostics" Description="Metadata, artwork cache, and local logs">
+                <toolkit:SettingsExpander.HeaderIcon><FontIcon Glyph="&#xE8B7;"/></toolkit:SettingsExpander.HeaderIcon>
+                <toolkit:SettingsExpander.Items>
+                    <toolkit:SettingsCard Header="Fetch Steam metadata" Description="Resolve names and artwork asynchronously; cached data remains available offline"><toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE753;"/></toolkit:SettingsCard.HeaderIcon><ToggleSwitch IsOn="{Binding FetchMetadata, Mode=TwoWay}"/></toolkit:SettingsCard>
+                    <toolkit:SettingsCard Header="Debug logging" Description="Include diagnostic events in the local log"><toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE7BA;"/></toolkit:SettingsCard.HeaderIcon><ToggleSwitch IsOn="{Binding DebugLogging, Mode=TwoWay}"/></toolkit:SettingsCard>
+                    <toolkit:SettingsCard Header="Cache directory" Description="Artwork and downloaded metadata cache">
+                        <toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE950;"/></toolkit:SettingsCard.HeaderIcon>
+                        <Grid MinWidth="280" MaxWidth="520" HorizontalAlignment="Stretch" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                            <TextBox Text="{Binding CacheDirectory, Mode=TwoWay}"/><Button Grid.Column="1" Command="{Binding BrowseCacheCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE8B7;"/><TextBlock Text="Browse"/></StackPanel></Button>
+                        </Grid>
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard Header="Artwork cache" Description="{Binding CacheSummary}"><toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xEB9F;"/></toolkit:SettingsCard.HeaderIcon><Button Command="{Binding ClearCacheCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE74D;"/><TextBlock Text="Clear artwork"/></StackPanel></Button></toolkit:SettingsCard>
+                    <toolkit:SettingsCard Header="Application data" Description="{Binding DataRoot}"><toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B7;"/></toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8B7;"/></toolkit:SettingsCard>
+                </toolkit:SettingsExpander.Items>
+            </toolkit:SettingsExpander>
+
+            <toolkit:SettingsExpander Header="Loader compatibility" Description="Read-only safety planning for legacy loader behavior">
+                <toolkit:SettingsExpander.HeaderIcon><FontIcon Glyph="&#xE83D;"/></toolkit:SettingsExpander.HeaderIcon>
+                <toolkit:SettingsExpander.Items>
+                    <toolkit:SettingsCard Header="Review loader plan" Description="No DLL is downloaded, copied, or executed by this build"><toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE9D5;"/></toolkit:SettingsCard.HeaderIcon><Button Command="{Binding ShowLoaderPlanCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE890;"/><TextBlock Text="Show plan"/></StackPanel></Button></toolkit:SettingsCard>
+                </toolkit:SettingsExpander.Items>
+            </toolkit:SettingsExpander>
+
+            <Button HorizontalAlignment="Right" Command="{Binding SaveCommand}" Style="{StaticResource AccentToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE74E;"/><TextBlock Text="Save settings"/></StackPanel></Button>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

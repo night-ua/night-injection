@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "NightInjection.UI (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "NightInjection.UI (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
