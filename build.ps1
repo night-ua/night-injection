@@ -15,6 +15,8 @@ $setupOutput = Join-Path $workRoot 'setup'
 $artifacts = Join-Path $repoRoot 'artifacts'
 $portableZip = Join-Path $artifacts 'NightInjection-Portable.zip'
 $setupFile = Join-Path $artifacts 'NightInjection-Setup.exe'
+$singleFileOutput = Join-Path $artifacts 'SingleFile'
+$singleFileSetup = Join-Path $singleFileOutput 'NightInjection-Setup.exe'
 $hashFile = Join-Path $artifacts 'SHA256.txt'
 
 function Invoke-DotNet([string[]]$Arguments) {
@@ -109,6 +111,12 @@ if ($verification.ExitCode -ne 0) {
     throw "Setup payload verification failed with exit code $($verification.ExitCode)."
 }
 
+New-Item -ItemType Directory -Path $singleFileOutput -Force | Out-Null
+Get-ChildItem -LiteralPath $singleFileOutput -Force |
+    Where-Object { -not $_.FullName.Equals($singleFileSetup, [StringComparison]::OrdinalIgnoreCase) } |
+    Remove-Item -Recurse -Force
+Copy-Item -LiteralPath $setupFile -Destination $singleFileSetup -Force
+
 $hashLines = foreach ($file in @($portableZip, $setupFile)) {
     $hash = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
     "$hash  $([IO.Path]::GetFileName($file))"
@@ -117,6 +125,6 @@ $hashLines | Set-Content -LiteralPath $hashFile -Encoding ascii
 
 Write-Host ''
 Write-Host 'Build complete:' -ForegroundColor Green
-Get-Item -LiteralPath $portableZip, $setupFile, $hashFile |
+Get-Item -LiteralPath $portableZip, $setupFile, $singleFileSetup, $hashFile |
     Select-Object Name, Length, LastWriteTime |
     Format-Table -AutoSize

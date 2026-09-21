@@ -23,6 +23,10 @@
                         <toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE73E;"/></toolkit:SettingsCard.HeaderIcon>
                         <StackPanel Orientation="Horizontal" Spacing="8"><Button Command="{Binding VerifySteamCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE73E;"/><TextBlock Text="Verify"/></StackPanel></Button><Button Command="{Binding DetectSteamCommand}" Style="{StaticResource ToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE721;"/><TextBlock Text="Auto detect"/></StackPanel></Button></StackPanel>
                     </toolkit:SettingsCard>
+                    <toolkit:SettingsCard Header="Lua Injection Destination" Description="Default location used when installing Lua files into Steam.">
+                        <toolkit:SettingsCard.HeaderIcon><FontIcon Glyph="&#xE8A5;"/></toolkit:SettingsCard.HeaderIcon>
+                        <ComboBox Width="180" ItemsSource="{Binding LuaInjectionTargets}" DisplayMemberPath="Label" SelectedItem="{Binding SelectedLuaInjectionTarget, Mode=TwoWay}"/>
+                    </toolkit:SettingsCard>
                 </toolkit:SettingsExpander.Items>
             </toolkit:SettingsExpander>
 

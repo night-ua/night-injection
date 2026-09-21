@@ -11,7 +11,16 @@ public sealed record SteamDirectories(
     string Plugin,
     string Lua,
     string DepotCache,
-    string LibraryCache);
+    string LibraryCache)
+{
+    public IReadOnlyList<string> GetLuaDirectories(LuaInjectionTarget target) => target switch
+    {
+        LuaInjectionTarget.Plugin => [Plugin],
+        LuaInjectionTarget.Lua => [Lua],
+        LuaInjectionTarget.Both => [Plugin, Lua],
+        _ => [Plugin]
+    };
+}
 
 public sealed record LoaderPlan(
     bool IsValid,

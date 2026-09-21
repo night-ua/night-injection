@@ -11,6 +11,7 @@ namespace NightInjection.Infrastructure.Networking;
 public sealed partial class AppIdService(
     HttpClient httpClient,
     IAppPathService paths,
+    ISettingsService settings,
     ISteamService steamService,
     SafeZipExtractor zipExtractor,
     ILogger<AppIdService> logger) : IAppIdService
@@ -48,8 +49,12 @@ public sealed partial class AppIdService(
         }
 
         var steamDirectories = steamService.GetDirectories(verification.Path);
-        var duplicate = Path.Combine(steamDirectories.Plugin, $"{normalizedId}.lua");
-        if (File.Exists(duplicate) && !force)
+        var luaInjectionTarget = settings.Current.LuaInjectionTarget;
+        var luaDirectories = steamDirectories.GetLuaDirectories(luaInjectionTarget);
+        var duplicate = luaDirectories
+            .Select(directory => Path.Combine(directory, $"{normalizedId}.lua"))
+            .FirstOrDefault(File.Exists);
+        if (duplicate is not null && !force)
         {
             return ErrorPlan(
                 verification.Path,
@@ -88,6 +93,7 @@ public sealed partial class AppIdService(
                     workingDirectory,
                     extractDirectory,
                     steamDirectories,
+                    luaInjectionTarget,
                     cancellationToken).ConfigureAwait(false);
                 if (plan.Entries.Count > 0)
                 {
@@ -175,6 +181,7 @@ public sealed partial class AppIdService(
         string workingDirectory,
         string extractDirectory,
         SteamDirectories steamDirectories,
+        LuaInjectionTarget luaInjectionTarget,
         CancellationToken cancellationToken)
     {
         var rule = RepositoryContentRules.Resolve(repository);
@@ -221,7 +228,7 @@ public sealed partial class AppIdService(
 
             var type = extension == ".lua" ? InjectionFileType.Lua : InjectionFileType.Manifest;
             var targetDirectories = type == InjectionFileType.Lua
-                ? new[] { steamDirectories.Plugin, steamDirectories.Lua }
+                ? steamDirectories.GetLuaDirectories(luaInjectionTarget)
                 : new[] { steamDirectories.DepotCache };
             foreach (var targetDirectory in targetDirectories)
             {

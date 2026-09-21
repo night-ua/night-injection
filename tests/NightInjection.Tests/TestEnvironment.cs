@@ -1,3 +1,5 @@
+using NightInjection.Core.Interfaces;
+using NightInjection.Core.Models;
 using NightInjection.Infrastructure.Configuration;
 
 namespace NightInjection.Tests;
@@ -52,5 +54,19 @@ internal sealed class StubHttpHandler(Func<HttpRequestMessage, HttpResponseMessa
     {
         CallCount++;
         return Task.FromResult(handler(request));
+    }
+}
+
+internal sealed class TestSettingsService(AppSettings? initial = null) : ISettingsService
+{
+    public AppSettings Current { get; private set; } = initial ?? new AppSettings();
+
+    public Task<AppSettings> InitializeAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(Current);
+
+    public Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
+    {
+        Current = settings;
+        return Task.CompletedTask;
     }
 }

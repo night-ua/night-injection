@@ -43,7 +43,13 @@ public sealed class LibraryService(
             }
 
             var directories = steamService.GetDirectories(verification.Path);
-            if (!Directory.Exists(directories.Lua))
+            var sourceFiles = new[] { directories.Plugin, directories.Lua }
+                .Where(Directory.Exists)
+                .SelectMany(directory => Directory.EnumerateFiles(directory, "*.lua", SearchOption.TopDirectoryOnly))
+                .Where(path => AppIdValidator.IsValid(Path.GetFileNameWithoutExtension(path)))
+                .DistinctBy(path => Path.GetFileNameWithoutExtension(path), StringComparer.Ordinal)
+                .ToArray();
+            if (sourceFiles.Length == 0)
             {
                 return [];
             }
@@ -54,9 +60,6 @@ public sealed class LibraryService(
                 .Where(static record => !string.IsNullOrWhiteSpace(record.AppId))
                 .GroupBy(static record => record.AppId!, StringComparer.Ordinal)
                 .ToDictionary(static group => group.Key, static group => group.First(), StringComparer.Ordinal);
-            var sourceFiles = Directory.EnumerateFiles(directories.Lua, "*.lua", SearchOption.TopDirectoryOnly)
-                .Where(path => AppIdValidator.IsValid(Path.GetFileNameWithoutExtension(path)))
-                .ToArray();
             var bag = new ConcurrentBag<LibraryItem>();
 
             await Parallel.ForEachAsync(

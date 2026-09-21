@@ -6,6 +6,8 @@ using NightInjection.UI.Services;
 
 namespace NightInjection.UI.ViewModels;
 
+public sealed record LuaInjectionTargetOption(LuaInjectionTarget Value, string Label);
+
 public sealed partial class SettingsViewModel(
     ISettingsService settings,
     ISteamService steam,
@@ -20,6 +22,7 @@ public sealed partial class SettingsViewModel(
     [ObservableProperty] public partial string SteamPath { get; set; } = string.Empty;
     [ObservableProperty] public partial string CacheDirectory { get; set; } = string.Empty;
     [ObservableProperty] public partial AppTheme Theme { get; set; }
+    [ObservableProperty] public partial LuaInjectionTargetOption SelectedLuaInjectionTarget { get; set; } = null!;
     [ObservableProperty] public partial bool AnimationsEnabled { get; set; }
     [ObservableProperty] public partial bool AutoScrollLogs { get; set; }
     [ObservableProperty] public partial bool RememberWindowSize { get; set; }
@@ -29,6 +32,12 @@ public sealed partial class SettingsViewModel(
     [ObservableProperty] public partial string LoaderSummary { get; set; } = "Planning only — no loader binaries are downloaded or executed.";
 
     public AppTheme[] Themes { get; } = Enum.GetValues<AppTheme>();
+    public LuaInjectionTargetOption[] LuaInjectionTargets { get; } =
+    [
+        new(LuaInjectionTarget.Plugin, "stplug-in"),
+        new(LuaInjectionTarget.Lua, "lua"),
+        new(LuaInjectionTarget.Both, "Both")
+    ];
     public string DataRoot => paths.DataRoot;
 
     [RelayCommand]
@@ -38,6 +47,7 @@ public sealed partial class SettingsViewModel(
         SteamPath = current.SteamPath;
         CacheDirectory = current.CacheDirectory;
         Theme = current.Theme;
+        SelectedLuaInjectionTarget = LuaInjectionTargets.First(option => option.Value == current.LuaInjectionTarget);
         AnimationsEnabled = current.AnimationsEnabled;
         AutoScrollLogs = current.AutoScrollLogs;
         RememberWindowSize = current.RememberWindowSize;
@@ -99,6 +109,7 @@ public sealed partial class SettingsViewModel(
             SteamPath = SteamPath.Trim(),
             CacheDirectory = string.IsNullOrWhiteSpace(CacheDirectory) ? paths.CoversRoot : CacheDirectory.Trim(),
             Theme = Theme,
+            LuaInjectionTarget = SelectedLuaInjectionTarget.Value,
             AnimationsEnabled = AnimationsEnabled,
             AutoScrollLogs = AutoScrollLogs,
             RememberWindowSize = RememberWindowSize,

@@ -9,7 +9,7 @@ namespace NightInjection.Tests;
 public sealed class InjectionServiceTests
 {
     [Fact]
-    public async Task PlanningIsADryOperationAndMapsLuaToBothLegacyFolders()
+    public async Task DefaultPluginPlanningIsADryOperationAndMapsLuaToPluginFolder()
     {
         using var environment = new TestEnvironment();
         var source = environment.CreateFile("input/220.lua", "addappid(220)");
@@ -18,10 +18,31 @@ public sealed class InjectionServiceTests
         var plan = await service.BuildFilePlanAsync([source], environment.Steam);
 
         Assert.True(plan.IsValid);
-        Assert.Equal(2, plan.Entries.Count);
-        Assert.Contains(plan.Entries, entry => entry.DestinationPath.EndsWith("config\\stplug-in\\220.lua", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(plan.Entries, entry => entry.DestinationPath.EndsWith("config\\lua\\220.lua", StringComparison.OrdinalIgnoreCase));
+        var entry = Assert.Single(plan.Entries);
+        Assert.EndsWith("config\\stplug-in\\220.lua", entry.DestinationPath, StringComparison.OrdinalIgnoreCase);
         Assert.All(plan.Entries, entry => Assert.False(File.Exists(entry.DestinationPath)));
+    }
+
+    [Theory]
+    [InlineData(LuaInjectionTarget.Plugin, 1, true, false)]
+    [InlineData(LuaInjectionTarget.Lua, 1, false, true)]
+    [InlineData(LuaInjectionTarget.Both, 2, true, true)]
+    public async Task PlanningUsesConfiguredLuaTarget(
+        LuaInjectionTarget target,
+        int expectedCount,
+        bool expectsPlugin,
+        bool expectsLua)
+    {
+        using var environment = new TestEnvironment();
+        var source = environment.CreateFile("input/730.lua", "addappid(730)");
+        var service = CreateService(environment, out _, target);
+
+        var plan = await service.BuildFilePlanAsync([source], environment.Steam);
+
+        Assert.True(plan.IsValid);
+        Assert.Equal(expectedCount, plan.Entries.Count);
+        Assert.Equal(expectsPlugin, plan.Entries.Any(entry => entry.DestinationPath.EndsWith("config\\stplug-in\\730.lua", StringComparison.OrdinalIgnoreCase)));
+        Assert.Equal(expectsLua, plan.Entries.Any(entry => entry.DestinationPath.EndsWith("config\\lua\\730.lua", StringComparison.OrdinalIgnoreCase)));
     }
 
     [Fact]
@@ -36,7 +57,7 @@ public sealed class InjectionServiceTests
         var result = await service.ExecutePlanAsync(plan);
 
         Assert.True(result.Succeeded);
-        Assert.Equal(3, result.AffectedPaths.Count);
+        Assert.Equal(2, result.AffectedPaths.Count);
         Assert.All(result.AffectedPaths, path => Assert.True(File.Exists(path)));
         Assert.Equal("lua-data", File.ReadAllText(Path.Combine(environment.Steam, "config", "stplug-in", "440.lua")));
         Assert.Equal("manifest-data", File.ReadAllText(Path.Combine(environment.Steam, "config", "depotcache", "440.manifest")));
@@ -54,7 +75,7 @@ public sealed class InjectionServiceTests
         var pluginTarget = environment.CreateFile("Steam/config/stplug-in/custom.lua", "old plugin");
         var luaTarget = environment.CreateFile("Steam/config/lua/custom.lua", "old lua");
         var expected = await File.ReadAllBytesAsync(source);
-        var service = CreateService(environment, out _);
+        var service = CreateService(environment, out _, LuaInjectionTarget.Both);
 
         var plan = await service.BuildFilePlanAsync([source], environment.Steam);
         var result = await service.ExecutePlanAsync(plan);
@@ -113,6 +134,24 @@ public sealed class InjectionServiceTests
     }
 
     [Fact]
+    public async Task RemoveAppIdRemovesLuaFromBothFoldersAndManifest()
+    {
+        using var environment = new TestEnvironment();
+        var plugin = environment.CreateFile("Steam/config/stplug-in/220.lua");
+        var lua = environment.CreateFile("Steam/config/lua/220.lua");
+        var manifest = environment.CreateFile("Steam/config/depotcache/220.manifest");
+        var service = CreateService(environment, out _);
+
+        var result = await service.RemoveAppIdAsync(environment.Steam, "220");
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(3, result.AffectedPaths.Count);
+        Assert.False(File.Exists(plugin));
+        Assert.False(File.Exists(lua));
+        Assert.False(File.Exists(manifest));
+    }
+
+    [Fact]
     public async Task ZipPlanningCleansOnlyOwnedTemporaryPlan()
     {
         using var environment = new TestEnvironment();
@@ -124,9 +163,11 @@ public sealed class InjectionServiceTests
             await writer.WriteAsync("addappid(30)");
         }
 
-        var service = CreateService(environment, out _);
+        var service = CreateService(environment, out _, LuaInjectionTarget.Lua);
         var plan = await service.BuildFilePlanAsync([zipPath], environment.Steam);
         Assert.True(plan.IsValid);
+        var plannedEntry = Assert.Single(plan.Entries);
+        Assert.EndsWith("config\\lua\\30.lua", plannedEntry.DestinationPath, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(plan.TemporaryDirectory);
         Assert.True(Directory.Exists(plan.TemporaryDirectory));
 
@@ -136,11 +177,41 @@ public sealed class InjectionServiceTests
         Assert.True(Directory.Exists(environment.Temp));
     }
 
-    private static InjectionService CreateService(TestEnvironment environment, out HistoryRepository history)
+    [Fact]
+    public async Task FailedSecondCommitRollsBackFirstCommittedFile()
+    {
+        using var environment = new TestEnvironment();
+        var firstSource = environment.CreateFile("input/first.lua", "new");
+        var secondSource = environment.CreateFile("input/second.lua", "blocked");
+        var firstDestination = environment.CreateFile("Steam/config/stplug-in/first.lua", "original");
+        var secondDestination = Path.Combine(environment.Steam, "config", "lua", "second.lua");
+        Directory.CreateDirectory(secondDestination);
+        var service = CreateService(environment, out _);
+        var plan = new InjectionPlan
+        {
+            SteamPath = environment.Steam,
+            Entries =
+            [
+                new(firstSource, "first.lua", firstDestination, InjectionFileType.Lua, 3, true),
+                new(secondSource, "second.lua", secondDestination, InjectionFileType.Lua, 7, false)
+            ]
+        };
+
+        var result = await service.ExecutePlanAsync(plan);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("original", await File.ReadAllTextAsync(firstDestination));
+    }
+
+    private static InjectionService CreateService(
+        TestEnvironment environment,
+        out HistoryRepository history,
+        LuaInjectionTarget target = LuaInjectionTarget.Plugin)
     {
         history = new HistoryRepository(environment.Paths, NullLogger<HistoryRepository>.Instance);
         return new InjectionService(
             environment.Paths,
+            new TestSettingsService(new AppSettings { LuaInjectionTarget = target }),
             new SteamService(),
             history,
             new SafeZipExtractor(),

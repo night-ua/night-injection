@@ -145,7 +145,10 @@ public sealed partial class SettingsService(
             SettingsVersion = AppSettings.CurrentSettingsVersion,
             WindowWidth = Math.Clamp(settings.WindowWidth, 720, 7680),
             WindowHeight = Math.Clamp(settings.WindowHeight, 520, 4320),
-            LastSection = string.IsNullOrWhiteSpace(settings.LastSection) ? "Dashboard" : settings.LastSection
+            LastSection = string.IsNullOrWhiteSpace(settings.LastSection) ? "Dashboard" : settings.LastSection,
+            LuaInjectionTarget = Enum.IsDefined(settings.LuaInjectionTarget)
+                ? settings.LuaInjectionTarget
+                : LuaInjectionTarget.Plugin
         };
     }
 

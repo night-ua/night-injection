@@ -9,7 +9,7 @@ namespace NightInjection.Tests;
 public sealed class LibraryServiceTests
 {
     [Fact]
-    public async Task LibraryUsesOnlyNumericLuaStemsAndDoesNotCreateMissingSteamFolders()
+    public async Task LibraryReadsBothFoldersDeduplicatesAppIdsAndPrefersPluginSource()
     {
         using var environment = new TestEnvironment();
         var history = new HistoryRepository(environment.Paths, NullLogger<HistoryRepository>.Instance);
@@ -18,15 +18,23 @@ public sealed class LibraryServiceTests
         var empty = await service.GetLibraryAsync(environment.Steam, fetchMetadata: true);
         Assert.Empty(empty);
         Assert.False(Directory.Exists(Path.Combine(environment.Steam, "config", "lua")));
+        Assert.False(Directory.Exists(Path.Combine(environment.Steam, "config", "stplug-in")));
 
-        environment.CreateFile("Steam/config/lua/220.lua");
+        var luaCopy = environment.CreateFile("Steam/config/lua/220.lua");
         environment.CreateFile("Steam/config/lua/not-an-id.lua");
+        var pluginCopy = environment.CreateFile("Steam/config/stplug-in/220.lua");
+        environment.CreateFile("Steam/config/stplug-in/730.lua");
+        File.SetLastWriteTimeUtc(luaCopy, new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var preferredWriteTime = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(pluginCopy, preferredWriteTime);
         var items = await service.GetLibraryAsync(environment.Steam, fetchMetadata: true, forceRefresh: true);
 
-        var item = Assert.Single(items);
+        Assert.Equal(2, items.Count);
+        var item = Assert.Single(items, item => item.AppId == "220");
         Assert.Equal("220", item.AppId);
         Assert.Equal("Title 220", item.Name);
         Assert.Equal("cover-220", item.CoverPath);
+        Assert.Equal(new DateTimeOffset(preferredWriteTime), item.LastProcessed);
     }
 
     private sealed class FakeMetadata : ISteamMetadataService

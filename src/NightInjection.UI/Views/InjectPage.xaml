@@ -39,6 +39,17 @@
                     <Button VerticalAlignment="Bottom" Command="{Binding InjectFilesCommand}" Style="{StaticResource AccentToolbarButtonStyle}"><StackPanel Orientation="Horizontal" Spacing="7"><FontIcon Glyph="&#xE898;"/><TextBlock Text="Inject selected files"/></StackPanel></Button></StackPanel>
             </StackPanel></Border>
 
+            <Border Style="{StaticResource CardStyle}"><StackPanel Spacing="10">
+                <StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE890;"/><TextBlock Text="Preview plan" Style="{StaticResource SectionTitleStyle}"/></StackPanel>
+                <TextBlock Text="{Binding PlanSummary}" Style="{StaticResource SecondaryTextStyle}"/>
+                <ListView ItemsSource="{Binding PlannedEntries}" SelectionMode="None" MaxHeight="240">
+                    <ListView.ItemTemplate><DataTemplate><StackPanel Padding="4,7">
+                        <TextBlock Text="{Binding DestinationPath}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding SourceDisplayName}" Style="{StaticResource CaptionTextBlockStyle}" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel></DataTemplate></ListView.ItemTemplate>
+                </ListView>
+            </StackPanel></Border>
+
         </StackPanel>
     </ScrollViewer>
 </Page>

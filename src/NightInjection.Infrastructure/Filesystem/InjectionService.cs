@@ -9,6 +9,7 @@ namespace NightInjection.Infrastructure.Filesystem;
 
 public sealed partial class InjectionService(
     IAppPathService paths,
+    ISettingsService settings,
     ISteamService steamService,
     IHistoryRepository history,
     SafeZipExtractor zipExtractor,
@@ -43,6 +44,7 @@ public sealed partial class InjectionService(
         var temporaryRoot = Path.Combine(paths.TemporaryRoot, $"plan-{planId:N}");
         var hasTemporaryFiles = false;
         var steamDirectories = steamService.GetDirectories(verification.Path);
+        var luaInjectionTarget = settings.Current.LuaInjectionTarget;
 
         foreach (var sourceValue in files)
         {
@@ -88,6 +90,7 @@ public sealed partial class InjectionService(
                             extractedPath,
                             $"{Path.GetFileName(source)} > {Path.GetRelativePath(extractDirectory, extractedPath)}",
                             steamDirectories,
+                            luaInjectionTarget,
                             entries,
                             destinationSources,
                             errors);
@@ -111,6 +114,7 @@ public sealed partial class InjectionService(
                 source,
                 Path.GetFileName(source),
                 steamDirectories,
+                luaInjectionTarget,
                 entries,
                 destinationSources,
                 errors);
@@ -387,6 +391,7 @@ public sealed partial class InjectionService(
         string source,
         string display,
         SteamDirectories directories,
+        LuaInjectionTarget luaInjectionTarget,
         ICollection<InjectionPlanEntry> entries,
         IDictionary<string, string> destinationSources,
         ICollection<string> errors)
@@ -394,11 +399,8 @@ public sealed partial class InjectionService(
         var extension = Path.GetExtension(source).ToLowerInvariant();
         var fileType = extension == ".lua" ? InjectionFileType.Lua : InjectionFileType.Manifest;
         var destinations = fileType == InjectionFileType.Lua
-            ? new[]
-            {
-                Path.Combine(directories.Plugin, Path.GetFileName(source)),
-                Path.Combine(directories.Lua, Path.GetFileName(source))
-            }
+            ? directories.GetLuaDirectories(luaInjectionTarget)
+                .Select(directory => Path.Combine(directory, Path.GetFileName(source)))
             : new[] { Path.Combine(directories.DepotCache, Path.GetFileName(source)) };
 
         foreach (var destination in destinations)

@@ -67,7 +67,7 @@ public sealed class NetworkingAndCatalogTests
         using var environment = new TestEnvironment();
         var handler = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
         var service = new AppIdService(
-            new HttpClient(handler), environment.Paths, new SteamService(), new SafeZipExtractor(),
+            new HttpClient(handler), environment.Paths, new TestSettingsService(), new SteamService(), new SafeZipExtractor(),
             NullLogger<AppIdService>.Instance);
 
         var plan = await service.BuildPlanAsync(environment.Steam, "../bad", false);
@@ -96,7 +96,9 @@ public sealed class NetworkingAndCatalogTests
             };
         });
         var service = new AppIdService(
-            new HttpClient(handler), environment.Paths, new SteamService(), new SafeZipExtractor(),
+            new HttpClient(handler), environment.Paths,
+            new TestSettingsService(new AppSettings { LuaInjectionTarget = LuaInjectionTarget.Both }),
+            new SteamService(), new SafeZipExtractor(),
             NullLogger<AppIdService>.Instance);
 
         var plan = await service.BuildPlanAsync(environment.Steam, "220", force: false);

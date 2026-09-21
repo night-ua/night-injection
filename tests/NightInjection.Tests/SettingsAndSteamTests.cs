@@ -8,6 +8,12 @@ namespace NightInjection.Tests;
 public sealed class SettingsAndSteamTests
 {
     [Fact]
+    public void NewSettingsDefaultToPluginLuaTarget()
+    {
+        Assert.Equal(LuaInjectionTarget.Plugin, new AppSettings().LuaInjectionTarget);
+    }
+
+    [Fact]
     public async Task SettingsRoundTripUsesJsonAndLeavesNoTemporaryFile()
     {
         using var environment = new TestEnvironment();
@@ -16,6 +22,7 @@ public sealed class SettingsAndSteamTests
         {
             SteamPath = environment.Steam,
             Theme = AppTheme.Dark,
+            LuaInjectionTarget = LuaInjectionTarget.Lua,
             FetchMetadata = false,
             WindowWidth = 1440,
             WindowHeight = 900
@@ -25,10 +32,42 @@ public sealed class SettingsAndSteamTests
         var result = await reloaded.InitializeAsync();
 
         Assert.Equal(AppTheme.Dark, result.Theme);
+        Assert.Equal(LuaInjectionTarget.Lua, result.LuaInjectionTarget);
         Assert.False(result.FetchMetadata);
         Assert.Equal(1440, result.WindowWidth);
         Assert.Equal(environment.Paths.CoversRoot, result.CacheDirectory);
         Assert.Empty(Directory.EnumerateFiles(environment.Data, "*.tmp"));
+    }
+
+    [Fact]
+    public async Task LegacySettingsWithoutLuaTargetDefaultToPlugin()
+    {
+        using var environment = new TestEnvironment();
+        environment.Paths.EnsureApplicationDirectories();
+        await File.WriteAllTextAsync(
+            environment.Paths.SettingsPath,
+            "{\"settings_version\":3,\"theme\":\"Dark\",\"steam_path\":\"C:\\\\Steam\"}");
+
+        var service = new SettingsService(environment.Paths, NullLogger<SettingsService>.Instance);
+        var result = await service.InitializeAsync();
+
+        Assert.Equal(AppTheme.Dark, result.Theme);
+        Assert.Equal(LuaInjectionTarget.Plugin, result.LuaInjectionTarget);
+    }
+
+    [Fact]
+    public async Task LuaTargetIsPersistedAsReadableJsonAndRestoredAfterRestart()
+    {
+        using var environment = new TestEnvironment();
+        var service = new SettingsService(environment.Paths, NullLogger<SettingsService>.Instance);
+
+        await service.SaveAsync(new AppSettings { LuaInjectionTarget = LuaInjectionTarget.Both });
+        var json = await File.ReadAllTextAsync(environment.Paths.SettingsPath);
+        var restarted = new SettingsService(environment.Paths, NullLogger<SettingsService>.Instance);
+        var result = await restarted.InitializeAsync();
+
+        Assert.Contains("\"lua_injection_target\": \"Both\"", json, StringComparison.Ordinal);
+        Assert.Equal(LuaInjectionTarget.Both, result.LuaInjectionTarget);
     }
 
     [Fact]

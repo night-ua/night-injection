@@ -10,9 +10,17 @@ public enum AppTheme
     Dark
 }
 
+[JsonConverter(typeof(JsonStringEnumConverter<LuaInjectionTarget>))]
+public enum LuaInjectionTarget
+{
+    Plugin,
+    Lua,
+    Both
+}
+
 public sealed record AppSettings
 {
-    public const int CurrentSettingsVersion = 3;
+    public const int CurrentSettingsVersion = 4;
     public const int DefaultWindowWidth = 1538;
     public const int DefaultWindowHeight = 924;
 
@@ -57,4 +65,7 @@ public sealed record AppSettings
 
     [JsonPropertyName("theme")]
     public AppTheme Theme { get; init; } = AppTheme.System;
+
+    [JsonPropertyName("lua_injection_target")]
+    public LuaInjectionTarget LuaInjectionTarget { get; init; } = LuaInjectionTarget.Plugin;
 }

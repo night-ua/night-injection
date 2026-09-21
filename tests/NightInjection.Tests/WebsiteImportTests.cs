@@ -91,6 +91,10 @@ public sealed class WebsiteImportTests
         var history = new HistoryRepository(environment.Paths, NullLogger<HistoryRepository>.Instance);
         var injection = new InjectionService(
             environment.Paths,
+            new TestSettingsService(new NightInjection.Core.Models.AppSettings
+            {
+                LuaInjectionTarget = NightInjection.Core.Models.LuaInjectionTarget.Lua
+            }),
             new SteamService(),
             history,
             new SafeZipExtractor(),
@@ -99,11 +103,8 @@ public sealed class WebsiteImportTests
         var plan = await injection.BuildFilePlanAsync(result.FilePaths, environment.Steam);
 
         Assert.True(plan.IsValid, string.Join(Environment.NewLine, plan.Errors));
-        Assert.Equal(2, plan.Entries.Count);
-        Assert.Contains(plan.Entries, entry =>
-            entry.DestinationPath.EndsWith("config\\lua\\730.lua", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(plan.Entries, entry =>
-            entry.DestinationPath.EndsWith("config\\stplug-in\\730.lua", StringComparison.OrdinalIgnoreCase));
+        var plannedEntry = Assert.Single(plan.Entries);
+        Assert.EndsWith("config\\lua\\730.lua", plannedEntry.DestinationPath, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
