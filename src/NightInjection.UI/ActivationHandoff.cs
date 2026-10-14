@@ -5,35 +5,42 @@ namespace NightInjection.UI;
 internal static class ActivationHandoff
 {
     private static string QueueRoot => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "night-injection",
+        Environment.GetEnvironmentVariable("NIGHT_INJECTION_DATA_ROOT") ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "night-injection"),
         "activation-queue");
 
-    public static void Enqueue(string activationUri)
+    public static void Enqueue(string activationUri, string? directory = null)
     {
         if (!WebsiteImportActivation.TryParse(activationUri, out _))
         {
             return;
         }
 
-        Directory.CreateDirectory(QueueRoot);
-        var path = Path.Combine(QueueRoot, $"{Guid.NewGuid():N}.pending");
+        var root = directory ?? QueueRoot;
+        Directory.CreateDirectory(root);
+        if (File.GetAttributes(root).HasFlag(FileAttributes.ReparsePoint)) return;
+        var path = Path.Combine(root, $"{Guid.NewGuid():N}.tmp");
         File.WriteAllText(path, activationUri);
+        File.Move(path, Path.ChangeExtension(path, ".pending"));
     }
 
-    public static IReadOnlyList<WebsiteImportRequest> DequeueAll()
+    public static IReadOnlyList<WebsiteImportRequest> DequeueAll(string? directory = null)
     {
-        if (!Directory.Exists(QueueRoot))
+        var root = directory ?? QueueRoot;
+        if (!Directory.Exists(root) || File.GetAttributes(root).HasFlag(FileAttributes.ReparsePoint))
         {
             return [];
         }
 
         var requests = new List<WebsiteImportRequest>();
-        foreach (var path in Directory.EnumerateFiles(QueueRoot, "*.pending")
-                     .Order(StringComparer.OrdinalIgnoreCase))
+        foreach (var path in Directory.EnumerateFiles(root, "*.pending")
+                     .OrderBy(File.GetLastWriteTimeUtc).Take(64))
         {
             try
             {
+                var info = new FileInfo(path);
+                if (info.Length > 2048 || info.LastWriteTimeUtc < DateTime.UtcNow.AddMinutes(-5)
+                    || info.Attributes.HasFlag(FileAttributes.ReparsePoint)) continue;
                 var value = File.ReadAllText(path);
                 if (value.Length <= 2048 && WebsiteImportActivation.TryParse(value, out var request))
                 {

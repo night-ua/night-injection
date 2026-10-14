@@ -15,6 +15,7 @@ public sealed class SafeZipExtractor
         CancellationToken cancellationToken = default)
     {
         var destinationRoot = Path.GetFullPath(destination);
+        RejectLinks(destinationRoot);
         var targets = new Dictionary<ZipArchiveEntry, string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         long expandedBytes = 0;
@@ -47,6 +48,7 @@ public sealed class SafeZipExtractor
             }
 
             var target = ResolveTarget(destinationRoot, entry.FullName);
+            RejectLinks(target);
             if (!seen.Add(target))
             {
                 throw new InvalidDataException($"ZIP contains duplicate output path: {entry.FullName}");
@@ -57,6 +59,7 @@ public sealed class SafeZipExtractor
 
         Directory.CreateDirectory(destinationRoot);
         var written = new List<string>(targets.Count);
+        long actualTotal = 0;
         foreach (var pair in targets)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -69,7 +72,19 @@ public sealed class SafeZipExtractor
                 FileShare.None,
                 81_920,
                 FileOptions.Asynchronous);
-            await source.CopyToAsync(output, cancellationToken).ConfigureAwait(false);
+            var buffer = new byte[81_920];
+            long actualEntry = 0;
+            while (true)
+            {
+                var read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+                if (read == 0) break;
+                actualEntry = checked(actualEntry + read);
+                actualTotal = checked(actualTotal + read);
+                if (actualEntry > pair.Key.Length || actualEntry > MaximumEntryBytes || actualTotal > MaximumExpandedBytes)
+                    throw new InvalidDataException("ZIP stream exceeds its declared safe size.");
+                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            }
+            if (actualEntry != pair.Key.Length) throw new InvalidDataException("ZIP stream size does not match its directory entry.");
             written.Add(pair.Value);
         }
 
@@ -79,8 +94,13 @@ public sealed class SafeZipExtractor
     private static void ValidateEntry(ZipArchiveEntry entry)
     {
         var name = entry.FullName.Replace('\\', '/');
+        var segments = name.Split('/', StringSplitOptions.RemoveEmptyEntries);
         if (Path.IsPathRooted(name)
-            || name.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(static part => part == "..")
+            || name.Length > 240 || name.Any(static c => c < 32)
+            || segments.Any(static part => part is "." or ".." || part.EndsWith('.') || part.EndsWith(' ')
+                || part.IndexOfAny(['<', '>', '"', '|', '?', '*', ':']) >= 0
+                || System.Text.RegularExpressions.Regex.IsMatch(part,
+                    @"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
             || name.Contains(':', StringComparison.Ordinal))
         {
             throw new InvalidDataException($"Unsafe ZIP entry: {entry.FullName}");
@@ -108,5 +128,15 @@ public sealed class SafeZipExtractor
         }
 
         return target;
+    }
+
+    private static void RejectLinks(string target)
+    {
+        for (var path = target; !string.IsNullOrEmpty(path); path = Path.GetDirectoryName(path))
+        {
+            if ((Directory.Exists(path) || File.Exists(path))
+                && File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint))
+                throw new InvalidDataException("ZIP extraction paths may not contain links or junctions.");
+        }
     }
 }

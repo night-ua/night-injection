@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Security.Cryptography;
 using Microsoft.Extensions.Logging;
 using NightInjection.Core.Interfaces;
 using NightInjection.Core.Models;
@@ -17,6 +18,38 @@ public sealed partial class InjectionService(
     ILogger<InjectionService> logger) : IInjectionService
 {
     private static readonly StringComparer PathComparer = StringComparer.OrdinalIgnoreCase;
+    private static readonly SemaphoreSlim MutationGate = new(1, 1);
+
+    private async Task<OperationResult> MutateAsync(Func<Task<OperationResult>> operation, CancellationToken token)
+    {
+        await MutationGate.WaitAsync(token).ConfigureAwait(false);
+        try
+        {
+            Directory.CreateDirectory(paths.DataRoot);
+            var lockPath = Path.Combine(paths.DataRoot, ".steam-file-mutation.lock");
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(token);
+            deadline.CancelAfter(TimeSpan.FromMinutes(2));
+            FileStream? lease = null;
+            while (lease is null)
+            {
+                deadline.Token.ThrowIfCancellationRequested();
+                try { lease = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
+                catch (IOException) { await Task.Delay(100, deadline.Token).ConfigureAwait(false); }
+            }
+            using (lease) return await operation().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { return OperationResult.Failure("The operation was cancelled while waiting for exclusive file access."); }
+        finally { MutationGate.Release(); }
+    }
+
+    public Task<OperationResult> ExecutePlanAsync(InjectionPlan plan, CancellationToken cancellationToken = default) =>
+        MutateAsync(() => ExecutePlanCoreAsync(plan, cancellationToken), cancellationToken);
+
+    public Task<OperationResult> RemoveAppIdAsync(string steamPath, string appId, CancellationToken cancellationToken = default) =>
+        MutateAsync(() => RemoveAppIdCoreAsync(steamPath, appId, cancellationToken), cancellationToken);
+
+    public Task<OperationResult> ClearPluginsAsync(string steamPath, CancellationToken cancellationToken = default) =>
+        MutateAsync(() => ClearPluginsCoreAsync(steamPath, cancellationToken), cancellationToken);
 
     public async Task<InjectionPlan> BuildFilePlanAsync(
         IReadOnlyCollection<string> files,
@@ -132,7 +165,7 @@ public sealed partial class InjectionService(
         };
     }
 
-    public async Task<OperationResult> ExecutePlanAsync(
+    private async Task<OperationResult> ExecutePlanCoreAsync(
         InjectionPlan plan,
         CancellationToken cancellationToken = default)
     {
@@ -160,6 +193,7 @@ public sealed partial class InjectionService(
         var staged = new List<StagedFile>(plan.Entries.Count);
         var committed = new List<StagedFile>(plan.Entries.Count);
         var affected = new List<string>(plan.Entries.Count);
+        var retainedBackups = new HashSet<string>(PathComparer);
 
         try
         {
@@ -179,8 +213,15 @@ public sealed partial class InjectionService(
                 var backup = Path.Combine(
                     destinationDirectory,
                     $".{Path.GetFileName(entry.DestinationPath)}.{transactionId}.bak");
-                await CopyAsync(entry.SourcePath, temporary, cancellationToken).ConfigureAwait(false);
                 staged.Add(new StagedFile(entry.DestinationPath, temporary, backup, File.Exists(entry.DestinationPath)));
+                await CopyAsync(entry.SourcePath, temporary, cancellationToken).ConfigureAwait(false);
+                if (entry.SourceSha256 is not null)
+                {
+                    await using var stagedStream = File.OpenRead(temporary);
+                    var stagedHash = Convert.ToHexString(await SHA256.HashDataAsync(stagedStream, cancellationToken).ConfigureAwait(false));
+                    if (!stagedHash.Equals(entry.SourceSha256, StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("A source file changed after preview. Rebuild and review the plan.");
+                }
             }
 
             foreach (var file in staged)
@@ -219,10 +260,11 @@ public sealed partial class InjectionService(
                 plan.Warnings);
         }
         catch (Exception exception) when (exception is IOException
+                                             or InvalidDataException
                                              or UnauthorizedAccessException
                                              or OperationCanceledException)
         {
-            RollBack(committed);
+            foreach (var backup in RollBack(committed)) retainedBackups.Add(backup);
             LogInjectionFailed(logger, exception, plan.AppId);
             if (exception is not OperationCanceledException)
             {
@@ -232,7 +274,8 @@ public sealed partial class InjectionService(
             return OperationResult.Failure(
                 exception is OperationCanceledException
                     ? "The operation was cancelled."
-                    : $"Injection failed: {exception.Message}",
+                    : $"Injection failed: {exception.Message}"
+                        + (retainedBackups.Count == 0 ? string.Empty : $" Recovery backups were preserved: {string.Join(", ", retainedBackups)}"),
                 affected,
                 plan.Warnings);
         }
@@ -241,14 +284,14 @@ public sealed partial class InjectionService(
             foreach (var file in staged)
             {
                 TryDelete(file.Temporary);
-                TryDelete(file.Backup);
+                if (!retainedBackups.Contains(file.Backup)) TryDelete(file.Backup);
             }
 
             await CleanupPlanAsync(plan).ConfigureAwait(false);
         }
     }
 
-    public async Task<OperationResult> RemoveAppIdAsync(
+    private async Task<OperationResult> RemoveAppIdCoreAsync(
         string steamPath,
         string appId,
         CancellationToken cancellationToken = default)
@@ -277,6 +320,8 @@ public sealed partial class InjectionService(
             Path.Combine(directories.DepotCache, $"{normalizedId}.manifest")
         };
         var removed = new List<string>();
+        if (targets.Any(target => !IsAllowedDestination(target, directories)))
+            return OperationResult.Failure("Removal contains a linked or unauthorized destination.");
         try
         {
             foreach (var target in targets)
@@ -305,7 +350,7 @@ public sealed partial class InjectionService(
         }
     }
 
-    public async Task<OperationResult> ClearPluginsAsync(
+    private async Task<OperationResult> ClearPluginsCoreAsync(
         string steamPath,
         CancellationToken cancellationToken = default)
     {
@@ -316,6 +361,8 @@ public sealed partial class InjectionService(
         }
 
         var pluginDirectory = steamService.GetDirectories(verification.Path).Plugin;
+        if (!IsAllowedDestination(Path.Combine(pluginDirectory, ".probe"), steamService.GetDirectories(verification.Path)))
+            return OperationResult.Failure("The plug-in directory is linked or outside allowed destinations.");
         var removed = new List<string>();
         try
         {
@@ -397,6 +444,8 @@ public sealed partial class InjectionService(
         ICollection<string> errors)
     {
         var extension = Path.GetExtension(source).ToLowerInvariant();
+        using var sourceStream = File.OpenRead(source);
+        var sourceHash = Convert.ToHexString(SHA256.HashData(sourceStream));
         var fileType = extension == ".lua" ? InjectionFileType.Lua : InjectionFileType.Manifest;
         var destinations = fileType == InjectionFileType.Lua
             ? directories.GetLuaDirectories(luaInjectionTarget)
@@ -418,7 +467,7 @@ public sealed partial class InjectionService(
                 destination,
                 fileType,
                 new FileInfo(source).Length,
-                File.Exists(destination)));
+                File.Exists(destination), SourceSha256: sourceHash));
         }
     }
 
@@ -429,10 +478,14 @@ public sealed partial class InjectionService(
             || extension.Equals(".manifest", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsAllowedDestination(string destination, SteamDirectories directories) =>
-        IsUnder(destination, directories.Plugin)
-        || IsUnder(destination, directories.Lua)
-        || IsUnder(destination, directories.DepotCache);
+    private static bool IsAllowedDestination(string destination, SteamDirectories directories)
+    {
+        if (!IsUnder(destination, directories.Plugin) && !IsUnder(destination, directories.Lua)
+            && !IsUnder(destination, directories.DepotCache)) return false;
+        for (var path = destination; !string.IsNullOrEmpty(path); path = Path.GetDirectoryName(path))
+            if ((File.Exists(path) || Directory.Exists(path)) && File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint)) return false;
+        return true;
+    }
 
     private static bool IsUnder(string candidate, string root)
     {
@@ -464,8 +517,9 @@ public sealed partial class InjectionService(
         await output.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private static void RollBack(IEnumerable<StagedFile> committed)
+    private static IReadOnlyList<string> RollBack(IEnumerable<StagedFile> committed)
     {
+        var retained = new List<string>();
         foreach (var file in committed.Reverse())
         {
             try
@@ -481,8 +535,10 @@ public sealed partial class InjectionService(
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
             {
+                if (file.Existed && File.Exists(file.Backup)) retained.Add(file.Backup);
             }
         }
+        return retained;
     }
 
     private async Task TryRecordFailureAsync(InjectionPlan plan, string details)

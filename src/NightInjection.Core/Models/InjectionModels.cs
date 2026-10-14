@@ -19,7 +19,8 @@ public sealed record InjectionPlanEntry(
     InjectionFileType FileType,
     long Size,
     bool WillOverwrite,
-    string ValidationMessage = "Ready");
+    string ValidationMessage = "Ready",
+    string? SourceSha256 = null);
 
 public sealed record InjectionPlan
 {

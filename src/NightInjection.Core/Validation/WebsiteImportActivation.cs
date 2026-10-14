@@ -7,10 +7,22 @@ public static class WebsiteImportActivation
     public const string Scheme = "night-injection";
     public static readonly Uri DefaultOrigin = new("https://www.darkdevil.space/");
 
-    public static bool TryParse(string? value, out WebsiteImportRequest request)
+    public static bool DevelopmentImportsEnabled
+    {
+        get
+        {
+#if DEBUG
+            return Environment.GetEnvironmentVariable("NIGHT_INJECTION_DEVELOPMENT_IMPORTS") == "1";
+#else
+            return false;
+#endif
+        }
+    }
+
+    public static bool TryParse(string? value, out WebsiteImportRequest request, bool allowLocalDevelopment = false)
     {
         request = null!;
-        if (string.IsNullOrWhiteSpace(value)
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 2048
             || !Uri.TryCreate(value.Trim().Trim('"'), UriKind.Absolute, out var uri)
             || !uri.Scheme.Equals(Scheme, StringComparison.OrdinalIgnoreCase)
             || !uri.Host.Equals("import", StringComparison.OrdinalIgnoreCase)
@@ -32,7 +44,7 @@ public static class WebsiteImportActivation
         }
 
         var candidate = parameters[0][appIdPrefix.Length..];
-        if (!AppIdValidator.IsValid(candidate) || !uint.TryParse(candidate, out _))
+        if (!IsCanonicalAppId(candidate))
         {
             return false;
         }
@@ -57,7 +69,7 @@ public static class WebsiteImportActivation
                 return false;
             }
 
-            if (!TryNormalizeOrigin(decodedOrigin, out origin))
+            if (!TryNormalizeOrigin(decodedOrigin, out origin, allowLocalDevelopment || DevelopmentImportsEnabled))
             {
                 return false;
             }
@@ -67,7 +79,15 @@ public static class WebsiteImportActivation
         return true;
     }
 
-    private static bool TryNormalizeOrigin(string value, out Uri origin)
+    public static bool IsCanonicalAppId(string? value) => value is { Length: > 0 and <= 10 }
+        && value[0] is >= '1' and <= '9'
+        && value.All(static c => c is >= '0' and <= '9')
+        && uint.TryParse(value, out _);
+
+    public static bool IsTrustedOrigin(Uri origin, bool allowLocalDevelopment = false) =>
+        TryNormalizeOrigin(origin.AbsoluteUri, out _, allowLocalDevelopment);
+
+    private static bool TryNormalizeOrigin(string value, out Uri origin, bool allowLocalDevelopment)
     {
         origin = null!;
         if (!Uri.TryCreate(value, UriKind.Absolute, out var candidate)
@@ -89,7 +109,7 @@ public static class WebsiteImportActivation
             return true;
         }
 
-        var local = candidate.Scheme == Uri.UriSchemeHttp
+        var local = allowLocalDevelopment && candidate.Scheme == Uri.UriSchemeHttp
             && candidate.Port is > 0 and <= 65535
             && (candidate.Host.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase)
                 || candidate.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase));

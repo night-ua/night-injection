@@ -23,9 +23,12 @@ public sealed partial class InjectViewModel(
     IAppIdService appIdService,
     IWebsiteImportService websiteImports,
     IFilePickerService picker,
-    IDialogService dialogs) : ViewModelBase
+    IDialogService dialogs,
+    ISteamMetadataService? metadata = null) : ViewModelBase
 {
     private InjectionPlan? _currentPlan;
+    private CancellationTokenSource? _importCancellation;
+    private string? _reviewedImportAppId;
     private readonly Dictionary<string, string> _temporaryImports = new(StringComparer.OrdinalIgnoreCase);
     public ObservableCollection<SelectedInjectionFile> Files { get; } = [];
     public ObservableCollection<InjectionPlanEntry> PlannedEntries { get; } = [];
@@ -42,7 +45,51 @@ public sealed partial class InjectViewModel(
 
     public string PlanSummary { get; private set; } = "No plan built yet.";
 
+    [ObservableProperty]
+    public partial string ImportStage { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial double DownloadPercent { get; set; }
+
+    [ObservableProperty]
+    public partial string GameName { get; set; } = string.Empty;
+
+    private bool CanEditFiles() => !IsBusy;
+
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.PropertyName == nameof(IsBusy))
+        {
+            BuildFilePlanCommand.NotifyCanExecuteChanged();
+            InjectFilesCommand.NotifyCanExecuteChanged();
+            FetchAppIdCommand.NotifyCanExecuteChanged();
+            BrowseCommand.NotifyCanExecuteChanged();
+            RemoveFileCommand.NotifyCanExecuteChanged();
+            ClearFilesCommand.NotifyCanExecuteChanged();
+            ExecuteCurrentPlanCommand.NotifyCanExecuteChanged();
+            ClearPluginsCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    [RelayCommand]
+    private async Task CancelImportAsync()
+    {
+        if (_importCancellation is not null) _importCancellation.Cancel();
+        else if (!IsBusy)
+        {
+            await ClearFilesAsync();
+            ImportStage = "Cancelled";
+            SetStatus("Import cancelled. No Steam files were changed.");
+        }
+    }
+
     public async Task AddFilesAsync(IEnumerable<string> paths)
+    {
+        if (!IsBusy) await AddFilesCoreAsync(paths);
+    }
+
+    private async Task AddFilesCoreAsync(IEnumerable<string> paths)
     {
         var changed = false;
         var normalized = paths
@@ -80,10 +127,10 @@ public sealed partial class InjectViewModel(
         SetStatus(Files.Count == 0 ? "Choose .lua, .manifest, or .zip files." : $"{Files.Count} file(s) selected.");
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanEditFiles))]
     private async Task BrowseAsync() => await AddFilesAsync(await picker.PickInjectionFilesAsync());
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanEditFiles))]
     private async Task RemoveFileAsync(SelectedInjectionFile? item)
     {
         if (item is not null && Files.Remove(item))
@@ -96,7 +143,7 @@ public sealed partial class InjectViewModel(
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanEditFiles))]
     private async Task ClearFilesAsync()
     {
         foreach (var file in Files)
@@ -133,6 +180,11 @@ public sealed partial class InjectViewModel(
 
     public async Task ImportFromWebsiteAsync(WebsiteImportRequest request)
     {
+        if (_reviewedImportAppId == request.AppId && Files.Count > 0)
+        {
+            SetStatus($"AppID {request.AppId} is already ready for review.");
+            return;
+        }
         if (IsBusy)
         {
             SetStatus("Another operation is already in progress.", true);
@@ -140,16 +192,32 @@ public sealed partial class InjectViewModel(
         }
 
         IsBusy = true;
+        AppId = request.AppId;
+        GameName = $"Steam AppID {request.AppId}";
+        DownloadPercent = 0;
+        _importCancellation = new CancellationTokenSource();
+        var metadataTask = LoadGameNameAsync(request.AppId, _importCancellation.Token);
+        var activeCancellation = _importCancellation;
         BuildFilePlanCommand.NotifyCanExecuteChanged();
         InjectFilesCommand.NotifyCanExecuteChanged();
         SetStatus($"Downloading the generated package for AppID {request.AppId}...");
         try
         {
-            var result = await websiteImports.DownloadAsync(request);
+            await ClearFilesAsync();
+            var progress = new Progress<WebsiteImportProgress>(value =>
+            {
+                if (activeCancellation.IsCancellationRequested) return;
+                ImportStage = value.Stage;
+                DownloadPercent = value.TotalBytes is > 0
+                    ? Math.Clamp(value.BytesReceived * 100d / value.TotalBytes.Value, 0, 100) : 0;
+            });
+            var result = await websiteImports.DownloadAsync(request, _importCancellation.Token, progress);
             if (!result.Succeeded
                 || result.FilePaths.Count == 0
                 || string.IsNullOrWhiteSpace(result.TemporaryDirectory))
             {
+                ImportStage = result.ErrorCode is NightInjection.Core.Results.ImportErrorCode.CONFIGURATION_NOT_FOUND
+                    or NightInjection.Core.Results.ImportErrorCode.GAME_NOT_SUPPORTED ? "Unsupported" : "Failed";
                 SetStatus(result.Message, true);
                 return;
             }
@@ -159,14 +227,50 @@ public sealed partial class InjectViewModel(
                 _temporaryImports[path] = result.TemporaryDirectory;
             }
 
-            await AddFilesAsync(result.FilePaths);
-            SetStatus(result.Message);
+            await AddFilesCoreAsync(result.FilePaths);
+            // Build a preview immediately; applying it is always a separate action.
+            _currentPlan = await Task.Run(() => injection.BuildFilePlanAsync(result.FilePaths, settings.Current.SteamPath, _importCancellation.Token));
+            foreach (var entry in _currentPlan.Entries) PlannedEntries.Add(entry);
+            PlanSummary = _currentPlan.IsValid
+                ? $"AppID {request.AppId}: {_currentPlan.Entries.Count} writes · {_currentPlan.OverwriteCount} overwrites · {FormatBytes(_currentPlan.TotalBytes)}"
+                : string.Join(Environment.NewLine, _currentPlan.Errors);
+            OnPropertyChanged(nameof(PlanSummary));
+            _reviewedImportAppId = request.AppId;
+            SetStatus(_currentPlan.IsValid ? result.Message + " Review the preview, then choose Apply Changes." : PlanSummary, !_currentPlan.IsValid);
+        }
+        catch (OperationCanceledException)
+        {
+            await ClearFilesAsync();
+            SetStatus("Import cancelled. No Steam files were changed.");
+            ImportStage = "Cancelled";
+        }
+        catch (Exception exception)
+        {
+            SetStatus($"Import failed: {exception.Message}", true);
         }
         finally
         {
+            _importCancellation?.Cancel();
+            await metadataTask;
+            _importCancellation?.Dispose();
+            _importCancellation = null;
             IsBusy = false;
             BuildFilePlanCommand.NotifyCanExecuteChanged();
             InjectFilesCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private async Task LoadGameNameAsync(string id, CancellationToken token)
+    {
+        if (metadata is null || !settings.Current.FetchMetadata) return;
+        try
+        {
+            var game = await metadata.GetAsync(id, token);
+            if (AppId == id && !token.IsCancellationRequested) GameName = game.Name;
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or IOException)
+        {
+            // Game names are optional; a metadata outage must not fail an import.
         }
     }
 
@@ -176,11 +280,12 @@ public sealed partial class InjectViewModel(
     private async Task FetchAppIdAsync() => await RunPlanAsync(
         () => appIdService.BuildPlanAsync(settings.Current.SteamPath, AppId.Trim(), ForceOverwrite));
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanEditFiles))]
     private Task ExecuteCurrentPlanAsync() => ApplyCurrentPlanAsync();
 
     private async Task ApplyCurrentPlanAsync()
     {
+        if (IsBusy) return;
         if (_currentPlan is null || !_currentPlan.IsValid)
         {
             SetStatus("Build a valid plan first.", true);
@@ -193,19 +298,16 @@ public sealed partial class InjectViewModel(
             return;
         }
 
-        var confirmed = await dialogs.ConfirmAsync(
-            "Apply injection plan?",
-            $"{_currentPlan.Entries.Count} file(s) will be written. {_currentPlan.OverwriteCount} existing file(s) will be replaced.",
-            "Apply changes");
-        if (!confirmed)
-        {
-            return;
-        }
-
         var executedPlan = _currentPlan;
         IsBusy = true;
         try
         {
+            var confirmed = await dialogs.ConfirmAsync(
+                "Apply injection plan?",
+                $"{executedPlan.Entries.Count} file(s) will be written. {executedPlan.OverwriteCount} existing file(s) will be replaced.",
+                "Apply changes");
+            if (!confirmed) return;
+
             var result = await injection.ExecutePlanAsync(executedPlan);
             if (result.Succeeded && executedPlan.SourceKind == InjectionSourceKind.LocalFiles)
             {
@@ -215,6 +317,7 @@ public sealed partial class InjectViewModel(
                 }
 
                 Files.Clear();
+                _reviewedImportAppId = null;
                 BuildFilePlanCommand.NotifyCanExecuteChanged();
                 InjectFilesCommand.NotifyCanExecuteChanged();
             }
@@ -239,7 +342,7 @@ public sealed partial class InjectViewModel(
         }
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanEditFiles))]
     private async Task ClearPluginsAsync()
     {
         if (!await dialogs.ConfirmAsync(
@@ -275,7 +378,7 @@ public sealed partial class InjectViewModel(
                 await injection.CleanupPlanAsync(previousPlan);
             }
 
-            _currentPlan = await factory();
+            _currentPlan = await Task.Run(factory);
             foreach (var entry in _currentPlan.Entries)
             {
                 PlannedEntries.Add(entry);
@@ -299,6 +402,7 @@ public sealed partial class InjectViewModel(
 
     private async Task ResetPlanAsync()
     {
+        _reviewedImportAppId = null;
         var previousPlan = _currentPlan;
         _currentPlan = null;
         PlannedEntries.Clear();

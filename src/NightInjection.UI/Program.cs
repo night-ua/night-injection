@@ -15,6 +15,21 @@ public static class Program
     [STAThread]
     public static async Task Main()
     {
+        if (Environment.GetCommandLineArgs().Skip(1).SequenceEqual(["--steam-worker"]))
+        {
+            // No WinUI Application.Start, window, activation or foreground UI in this mode.
+            try { await SteamWorkerHost.RunAsync().ConfigureAwait(false); }
+            catch (Exception exception)
+            {
+                var root = Environment.GetEnvironmentVariable("NIGHT_INJECTION_DATA_ROOT") ?? Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "night-injection");
+                try { Directory.CreateDirectory(root); File.AppendAllText(Path.Combine(root, "steam-worker-crash.log"), exception + Environment.NewLine); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+                Environment.ExitCode = 1;
+            }
+            return;
+        }
         WinRT.ComWrappersSupport.InitializeComWrappers();
         var current = AppInstance.GetCurrent();
         InitialActivation = current.GetActivatedEventArgs();

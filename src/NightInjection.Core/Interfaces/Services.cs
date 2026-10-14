@@ -67,8 +67,11 @@ public interface IWebsiteImportService
 {
     Task<WebsiteImportResult> DownloadAsync(
         WebsiteImportRequest request,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        IProgress<WebsiteImportProgress>? progress = null);
 }
+
+public sealed record WebsiteImportProgress(string Stage, long BytesReceived = 0, long? TotalBytes = null);
 
 public interface ILibraryService
 {

@@ -10,6 +10,17 @@
                 <TextBlock Text="Build and review a deterministic plan before any Steam files are changed." Style="{StaticResource SecondaryTextStyle}"/></StackPanel>
             <InfoBar IsOpen="{Binding HasStatus}" Message="{Binding StatusMessage}" IsClosable="False" Severity="Informational"/>
             <ProgressBar IsIndeterminate="True" Visibility="{Binding IsBusy}"/>
+            <Border Style="{StaticResource CardStyle}"><StackPanel Spacing="10">
+                <TextBlock Text="DarkDevil Import" Style="{StaticResource SectionTitleStyle}"/>
+                <TextBlock Text="{Binding GameName}" Style="{StaticResource SecondaryTextStyle}"/>
+                <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="AppID:"/><TextBlock Text="{Binding AppId}"/></StackPanel>
+                <TextBlock Text="{Binding ImportStage}" Style="{StaticResource SecondaryTextStyle}"/>
+                <ProgressBar Minimum="0" Maximum="100" Value="{Binding DownloadPercent}"/>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Content="Apply Changes" Command="{Binding ExecuteCurrentPlanCommand}" Style="{StaticResource AccentToolbarButtonStyle}"/>
+                    <Button Content="Cancel" Command="{Binding CancelImportCommand}" Style="{StaticResource ToolbarButtonStyle}"/>
+                </StackPanel>
+            </StackPanel></Border>
 
             <Border x:Name="DropZone" Style="{StaticResource CardStyle}" Background="{ThemeResource DropZoneBackgroundBrush}"
                     BorderBrush="{ThemeResource AccentFillColorDefaultBrush}" BorderThickness="2" AllowDrop="True"
@@ -46,6 +57,7 @@
                     <ListView.ItemTemplate><DataTemplate><StackPanel Padding="4,7">
                         <TextBlock Text="{Binding DestinationPath}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis"/>
                         <TextBlock Text="{Binding SourceDisplayName}" Style="{StaticResource CaptionTextBlockStyle}" TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Replace existing file:"/><TextBlock Text="{Binding WillOverwrite}"/></StackPanel>
                     </StackPanel></DataTemplate></ListView.ItemTemplate>
                 </ListView>
             </StackPanel></Border>

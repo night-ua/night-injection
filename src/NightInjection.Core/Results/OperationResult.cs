@@ -29,14 +29,22 @@ public sealed record WebsiteImportResult(
     bool Succeeded,
     string Message,
     IReadOnlyList<string> FilePaths,
-    string? TemporaryDirectory)
+    string? TemporaryDirectory,
+    ImportErrorCode? ErrorCode = null,
+    int? HttpStatus = null)
 {
     public static WebsiteImportResult Success(
         IReadOnlyList<string> filePaths,
         string temporaryDirectory,
         string message) =>
-        new(true, message, filePaths, temporaryDirectory);
+        new(true, message, filePaths, temporaryDirectory, HttpStatus: 200);
 
-    public static WebsiteImportResult Failure(string message) =>
-        new(false, message, [], null);
+    public static WebsiteImportResult Failure(string message, ImportErrorCode errorCode = ImportErrorCode.DOWNLOAD_FAILED, int? httpStatus = null) =>
+        new(false, message, [], null, errorCode, httpStatus);
+}
+
+public enum ImportErrorCode
+{
+    GAME_NOT_SUPPORTED, CONFIGURATION_NOT_FOUND, NETWORK_ERROR, SERVER_ERROR,
+    RATE_LIMITED, DOWNLOAD_FAILED, PACKAGE_INVALID, VALIDATION_FAILED, APPLY_FAILED, CANCELLED
 }
