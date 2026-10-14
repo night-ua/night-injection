@@ -4,6 +4,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="coverlet.collector" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
@@ -17,5 +18,11 @@
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Update="fixtures\*.star" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="..\..\installer\Shared\SteamBridgeDeployment.cs" Link="SteamBridgeDeployment.cs" />
+    <Compile Include="..\..\src\NightInjection.UI\ActivationHandoff.cs" Link="ActivationHandoff.cs" />
+    <Compile Include="..\..\src\NightInjection.UI\ViewModels\ViewModelBase.cs" Link="ViewModelBase.cs" />
+    <Compile Include="..\..\src\NightInjection.UI\ViewModels\InjectViewModel.cs" Link="InjectViewModel.cs" />
+    <Compile Include="..\..\src\NightInjection.UI\Services\IUiServices.cs" Link="IUiServices.cs" />
   </ItemGroup>
 </Project>

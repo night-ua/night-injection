@@ -35,7 +35,8 @@ $projects = @(
     'src\NightInjection.Core',
     'src\NightInjection.Infrastructure',
     'src\NightInjection.UI',
-    'tests\NightInjection.Tests'
+    'tests\NightInjection.Tests',
+    'tests\NightInjection.IntegrationDriver'
 )
 
 foreach ($project in $projects) {
@@ -46,6 +47,7 @@ foreach ($project in $projects) {
 foreach ($directory in @('.vs', 'TestResults', 'AppPackages', 'BundleArtifacts', 'publish')) {
     Remove-GeneratedItem (Join-Path $repoRoot $directory) -Recurse
 }
+Remove-GeneratedItem (Join-Path $repoRoot 'tests\NightInjection.Tests\TestResults') -Recurse
 
 foreach ($directory in @(
     'build\out',

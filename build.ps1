@@ -1,7 +1,8 @@
 param(
     [ValidateSet('Release', 'Debug')]
     [string]$Configuration = 'Release',
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [string]$TrustedPackagePublicKey = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,8 +19,29 @@ $setupFile = Join-Path $artifacts 'NightInjection-Setup.exe'
 $singleFileOutput = Join-Path $artifacts 'SingleFile'
 $singleFileSetup = Join-Path $singleFileOutput 'NightInjection-Setup.exe'
 $hashFile = Join-Path $artifacts 'SHA256.txt'
+$bridgeRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot '..\steam-bridge'))
+$bridgePackage = [IO.Path]::GetFullPath((Join-Path $repoRoot '..\artifacts\space.darkdevil.steam-bridge.star'))
+if ($TrustedPackagePublicKey -and ([Convert]::FromBase64String($TrustedPackagePublicKey).Length -ne 32)) {
+    throw 'TrustedPackagePublicKey must be a Base64-encoded 32-byte Ed25519 public key.'
+}
+
+Push-Location $bridgeRoot
+try {
+    & npm ci --ignore-scripts
+    if ($LASTEXITCODE -ne 0) { throw 'Steam Bridge restore failed.' }
+    & npm run build
+    if ($LASTEXITCODE -ne 0) { throw 'Steam Bridge compilation failed.' }
+    if (-not $SkipTests) {
+        & npm test
+        if ($LASTEXITCODE -ne 0) { throw 'Steam Bridge tests failed.' }
+    }
+} finally { Pop-Location }
+
+# Keep the regression fixture tied to the package emitted by the official compiler.
+Copy-Item -LiteralPath $bridgePackage -Destination (Join-Path $repoRoot 'tests\NightInjection.Tests\fixtures\space.darkdevil.steam-bridge.star') -Force
 
 function Invoke-DotNet([string[]]$Arguments) {
+    if ($TrustedPackagePublicKey) { $Arguments += "-p:TrustedPackagePublicKey=$TrustedPackagePublicKey" }
     & dotnet @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet failed with exit code $LASTEXITCODE."
@@ -62,6 +84,9 @@ if (-not (Test-Path -LiteralPath $publishedExecutable)) {
     throw "Published executable was not created: $publishedExecutable"
 }
 Move-Item -LiteralPath $publishedExecutable -Destination $simpleExecutable -Force
+New-Item -ItemType Directory -Path (Join-Path $portableOutput 'steam-bridge') -Force | Out-Null
+Copy-Item -LiteralPath $bridgePackage -Destination (Join-Path $portableOutput 'steam-bridge\space.darkdevil.steam-bridge.star') -Force
+Copy-Item -LiteralPath (Join-Path $bridgeRoot 'README.md') -Destination (Join-Path $portableOutput 'steam-bridge\README.md') -Force
 
 Get-ChildItem -LiteralPath $portableOutput -Filter '*.pdb' -File -Recurse | Remove-Item -Force
 if (Test-Path -LiteralPath $portableZip) {
@@ -112,6 +137,10 @@ if ($verification.ExitCode -ne 0) {
 }
 
 New-Item -ItemType Directory -Path $singleFileOutput -Force | Out-Null
+$resolvedSingle = [IO.Path]::GetFullPath($singleFileOutput)
+if (-not $resolvedSingle.StartsWith($repoRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'Refusing to clean a SingleFile folder outside the repository.'
+}
 Get-ChildItem -LiteralPath $singleFileOutput -Force |
     Where-Object { -not $_.FullName.Equals($singleFileSetup, [StringComparison]::OrdinalIgnoreCase) } |
     Remove-Item -Recurse -Force

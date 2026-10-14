@@ -28,9 +28,10 @@ public sealed class WebsiteImportTests
     {
         const string value = "night-injection://import?appId=264710&origin=http%3A%2F%2F127.0.0.1%3A3000";
 
-        Assert.True(WebsiteImportActivation.TryParse(value, out var request));
+        Assert.True(WebsiteImportActivation.TryParse(value, out var request, allowLocalDevelopment: true));
         Assert.Equal("264710", request.AppId);
         Assert.Equal(new Uri("http://127.0.0.1:3000/"), request.Origin);
+        Assert.False(WebsiteImportActivation.TryParse(value, out _));
     }
 
     [Theory]
@@ -73,7 +74,7 @@ public sealed class WebsiteImportTests
             new HttpClient(handler),
             environment.Paths,
             new SafeZipExtractor(),
-            NullLogger<WebsiteImportService>.Instance);
+            NullLogger<WebsiteImportService>.Instance, new PackageSignatureVerifier(string.Empty));
 
         var result = await service.DownloadAsync(new WebsiteImportRequest(
             "730", WebsiteImportActivation.DefaultOrigin));
@@ -128,7 +129,7 @@ public sealed class WebsiteImportTests
             new HttpClient(handler),
             environment.Paths,
             new SafeZipExtractor(),
-            NullLogger<WebsiteImportService>.Instance);
+            NullLogger<WebsiteImportService>.Instance, new PackageSignatureVerifier(string.Empty));
 
         var result = await service.DownloadAsync(new WebsiteImportRequest(
             "730", WebsiteImportActivation.DefaultOrigin));
@@ -160,13 +161,13 @@ public sealed class WebsiteImportTests
             new HttpClient(handler),
             environment.Paths,
             new SafeZipExtractor(),
-            NullLogger<WebsiteImportService>.Instance);
+            NullLogger<WebsiteImportService>.Instance, new PackageSignatureVerifier(string.Empty));
 
         var result = await service.DownloadAsync(new WebsiteImportRequest(
             "730", WebsiteImportActivation.DefaultOrigin));
 
         Assert.False(result.Succeeded);
-        Assert.Contains("Could not download", result.Message, StringComparison.Ordinal);
+        Assert.Contains("Package validation failed", result.Message, StringComparison.Ordinal);
         Assert.Empty(Directory.EnumerateFileSystemEntries(Path.Combine(environment.Temp, "website-imports")));
     }
 

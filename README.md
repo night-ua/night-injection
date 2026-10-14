@@ -23,6 +23,68 @@ Night Injection is a desktop application built with C#, .NET 10, WinUI 3, and Wi
 
 This repository contains the desktop tool, its core services, automated tests, Setup wizard, and uninstaller. It does not contain the companion website.
 
+## What's New — Nght-Bridge 2.0.2
+
+Import game configurations directly from a Steam store page with **Nght-Bridge**. The button appears beside **Community Hub** and opens a compact popup inside Steam. Night Injection runs in the background using the same import, validation, and file application services as the desktop tool.
+
+### New Features And Improvements
+
+- **Updated name and logo:** The button, plugin, and popup are now named **Nght-Bridge**, with the supplied logo displayed beside the name. The logo is bundled with the plugin and does not require a website download.
+- **Steam appearance by default:** The button reuses Community Hub's native classes, colors, dimensions, and hover behavior. **Steam Native (Default)** is the default appearance setting; custom colors and previously saved choices remain available.
+- **Embedded import popup:** View the game name, AppID, actual task status, download progress, verification, and file preview, with Apply, Cancel, and Retry controls. The full application remains accessible through **Open Night Injection**.
+- **Improved UI/UX:** **Prepare / Review / Apply** stages, a clear manual/automatic mode indicator, **New file / Replace** badges, and expandable file destinations. Action buttons remain outside the scrolling area. The popup supports a 390px viewport, keyboard navigation, and Escape.
+- **Telegram file guidance:** Games listed in `website/config/game-requirements.json` display an additional-files notice and an **Open Nightfile Bot** link. This release includes 151 games, each with its exact AppID in the link, such as [Nightfile Bot for AppID 7940](https://t.me/Nightfile_bot?start=7940). Open the bot and press **Start** to obtain the additional files; applying the bridge configuration does not install them.
+- **Existing features preserved:** Local imports, Dry Run, the library, history, settings, and `night-injection://` links remain available. The file application engine, backup behavior, and rollback protection are retained.
+
+### Automatic Apply Fix
+
+**Automatic Apply** remains **OFF** by default. Enabling it requires explicit consent to write or replace files after validation.
+
+Previously, an import captured the automatic setting when it started. Enabling the option after preparing a package did not affect that task, making the option appear to require a Steam restart or a new import. In **2.0.2**, enabling consent includes the current task and future import clicks: a verified ready task applies immediately, while an active download finishes validation before applying, **without restarting Steam**. Other manual tasks are not applied retroactively, and completed tasks are not applied again.
+
+Delayed status and cached-preference responses can no longer turn the saved option back OFF. Disabling Automatic Apply prevents future automatic imports from writing files. Validation and rollback remain active in both modes.
+
+### Import Fixes From Earlier Updates
+
+- Fixed **`"[object Object]" is not valid JSON`**. Millennium can return an already-decoded JavaScript object; the transport now distinguishes objects from JSON strings and validates fields and AppID/TaskId associations instead of parsing a response twice.
+- Fixed validation of actual Starlight packages, which previously caused the installer error **The Steam Bridge payload is not a Starlight package**.
+- Added distinct connection, server, download, validation, and **Configuration Not Found** failures. Failed imports leave the Connecting state, and temporary errors receive bounded retries.
+- Improved compatibility with generator-produced Lua filenames and safe data declarations while continuing to reject executable content, unsafe paths, empty packages, and configurations for another game.
+- Prevented duplicate buttons and imports, handled navigation between games, and retained task outcomes, settings, and background-worker reconnection.
+
+### Install, Upgrade, And Use
+
+1. Download Setup 2.0.2 from this repository's Releases page to update **the application, background worker, and plugin together**. Updating only the `.star` file does not update the worker.
+2. Select **Enable DarkDevil Steam Integration** in Setup and verify the Steam directory. The integration requires **Millennium** to be installed first; the standalone Night Injection application does not require the plugin.
+3. Restart Steam once to load the updated plugin, then enable **Nght-Bridge** in Millennium settings.
+4. Open a Steam store game page and select **Nght-Bridge** beside Community Hub.
+5. In manual mode, review the files and destinations, then select **Apply Changes** and confirm. If you enable **Automatic Apply** and approve its consent prompt, it takes effect immediately for the current task and future imports.
+6. If the additional-files notice appears, open **Nightfile Bot** from the popup and press **Start** in Telegram.
+
+**The 2.0.2 changes do not require a website deployment.** If a custom color is already saved, select **Steam Native (Default)** to restore Steam's appearance. **Reset to Default** also restores the other import defaults, including Automatic Apply OFF.
+
+### Release Files
+
+| File | Purpose |
+| --- | --- |
+| `NightInjection-Setup-V2.0.2.exe` | Recommended installer for updating the application, worker, and plugin. |
+| `NightInjection-Portable-V2.0.2.zip` | Portable application; Windows protocol registration and worker launch registration are provided by Setup. |
+| `Nght-Bridge-2.0.2.star` | Millennium plugin; requires the updated Night Injection worker. |
+| `DarkDevil-Integration-V2.0.2-Source.zip` | Complete application, website, plugin, tests, and documentation source. |
+| `SHA256.txt` | Distribution file checksums. |
+
+Generated distributions belong in Releases, not Git. Build from the repository root using the sibling `website/` and `steam-bridge/` projects. `./clean.ps1` in the repository root removes generated files when preparing a source upload.
+
+### Verification And Security Results For 2.0.2
+
+**122 C# tests, 25 plugin JavaScript tests, 65 website tests, and 5 website browser tests passed.** Coverage includes ZIP paths and limits, SHA-256 and configured signatures, consent and rollback, local IPC, JSON, XSS and links, navigation and deduplication, settings persistence, and delayed responses. npm and NuGet audits reported no known vulnerabilities at the time of verification; this does not guarantee the absence of every possible vulnerability.
+
+**Bodycam 2406770**, **730**, and **7940** were tested through the actual website API, background worker, and Windows IPC, with writes confined to an isolated Steam test directory. AppID 730 moved from ReadyToApply to Completed when Automatic Apply was enabled, without restarting or sending a manual Apply command. AppID 7940 displayed the bot notice. User settings and task files remained identical before and after testing. Builds completed and Setup's embedded payload passed `/verify`.
+
+Visual verification used Chromium with official Steam markup and CSS. Final acceptance inside the Steam client and with custom Steam themes remains a check after installation. Ed25519 package-source authentication depends on configuring matching production keys on the client and server; this release did not add a production key.
+
+Implementation and verification details are available in the [Nght-Bridge 2.0.2 report](../docs/NGHT-BRIDGE-2.0.2.ar.md) and the [2.0.1 JSON fix report](../docs/V2.0.1-FIX-REPORT.ar.md). These supporting reports are written in Arabic.
+
 ## Features
 
 - Native Windows 10/11 interface with system, light, and dark themes.
@@ -36,6 +98,9 @@ This repository contains the desktop tool, its core services, automated tests, S
 - Searchable operation history and local diagnostic logs.
 - Per-user Setup wizard, Start menu shortcut, optional Desktop shortcut, and uninstaller.
 - Registered `night-injection://` protocol for importing generated packages into the application.
+- Optional Millennium integration with the native-styled Nght-Bridge button and an embedded Steam popup.
+- Background imports with real progress, package verification, manual approval, and explicitly enabled Automatic Apply.
+- Game-specific Nightfile Bot guidance for required additional files.
 
 ## Import Workflow
 
@@ -111,6 +176,8 @@ Setup also:
 
 Close Night Injection before installing an update so Setup can replace its files safely.
 
+For Steam integration, select **Enable DarkDevil Steam Integration** in Setup. The installer updates the receipt-owned plugin and stops the background worker gracefully during an upgrade. Restart Steam after updating the plugin; changing import preferences afterward does not require another restart.
+
 ### Portable Build
 
 The portable distribution is available at:
@@ -139,6 +206,8 @@ The release artifacts are self-contained and do not require a separate .NET inst
 - .NET 10 SDK.
 - Visual Studio with the Windows application development workload for IDE development.
 - Windows 10 SDK and Windows App SDK dependencies restored through NuGet.
+- Node.js 24 and npm for the Millennium bridge build and JavaScript tests.
+- The sibling `steam-bridge/` and `website/` projects from the full integration source archive. The bridge build reads the website theme, supplied logo, and game requirements from those projects.
 
 ## Build And Test
 
@@ -150,14 +219,16 @@ Run the complete release pipeline from PowerShell:
 
 The script:
 
-1. restores dependencies;
-2. regenerates Windows icon assets;
-3. builds the complete solution;
-4. runs the automated tests;
-5. publishes the self-contained desktop application;
-6. creates the portable ZIP and Setup executable;
+1. restores bridge dependencies and builds the Starlight plugin with the bundled theme, logo, and game requirements;
+2. runs the bridge tests and refreshes the actual `.star` regression fixture;
+3. restores .NET dependencies and regenerates Windows icon assets;
+4. builds the complete solution and runs the C# tests;
+5. publishes the self-contained desktop application and background worker;
+6. bundles the bridge and creates the portable ZIP and Setup executable;
 7. verifies the embedded installer payload and Wizard layout;
 8. writes SHA-256 hashes.
+
+Website tests and the browser/API integration checks run separately; their recorded 2.0.2 results are described above.
 
 Build and test directly during development:
 
@@ -191,6 +262,8 @@ Application state is stored under:
 | `cache\steam_metadata.json` | Cached Steam names and metadata. |
 | `logs\night-injection_YYYYMMDD.log` | Daily diagnostic logs. |
 | `activation-queue` | Validated protocol handoff files for an already-running instance. |
+| `steam-bridge\settings.json` | Native/custom button appearance and Automatic Apply preferences. |
+| `steam-bridge\tasks.json` | Background import snapshots and completed task outcomes. |
 
 Temporary import and plan files are stored below `%TEMP%\night-injection` and are removed when selections are cleared, plans are cleaned, or an injection succeeds.
 
@@ -224,7 +297,7 @@ The UI follows MVVM and resolves services through the .NET Generic Host. Core co
 - Conflicting package files are rejected instead of silently overwritten.
 - Injection writes are staged and existing files are backed up before commit.
 - Expected I/O failures trigger rollback.
-- Destructive actions require confirmation.
+- Manual file application requires confirmation. Steam Automatic Apply requires explicit opt-in and uses the same validation and rollback rules.
 - No downloaded executable, DLL, command shell, or PowerShell script is automatically executed.
 
 The Loader section is planning-only. Night Injection does not download or install loader DLLs.
