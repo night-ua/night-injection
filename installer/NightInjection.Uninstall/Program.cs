@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
+using NightInjection.Installation;
 
 namespace NightInjection.Uninstall;
 
@@ -26,6 +27,7 @@ internal static class Program
                 return 1;
             }
 
+            SteamWorkerControl.StopForUpgrade(Path.Combine(installRoot, "NightInjection.exe"));
             if (new[] { "NightInjection", "NightInjection.UI" }
                 .SelectMany(Process.GetProcessesByName)
                 .Any())
@@ -43,6 +45,7 @@ internal static class Program
                 return 0;
             }
 
+            SteamBridgeDeployment.Remove(installRoot);
             DeleteFile(Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
                 "Night Injection.lnk"));
@@ -75,7 +78,7 @@ internal static class Program
             NativeMethods.MoveFileEx(installRoot, null, 0x4);
             Show(
                 "Night Injection was removed",
-                "Application files and shortcuts were removed. Windows will clean the small uninstaller stub after restart. Your application data was kept.");
+                "Application files and shortcuts were removed. Windows will clean the small uninstaller stub after restart. Your application data was kept. Restart Steam to unload the bridge.");
             return 0;
         }
         catch (Exception exception)

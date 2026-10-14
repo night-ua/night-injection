@@ -19,8 +19,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <DebugType>none</DebugType>
-    <Version>1.1.0</Version>
+    <Version>2.0.2</Version>
     <Product>Night Injection Uninstaller</Product>
     <Company>Night Injection</Company>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\SteamBridgeDeployment.cs" Link="SteamBridgeDeployment.cs" />
+    <Compile Include="..\Shared\SteamWorkerControl.cs" Link="SteamWorkerControl.cs" />
+  </ItemGroup>
 </Project>

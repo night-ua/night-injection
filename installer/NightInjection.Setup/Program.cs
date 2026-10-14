@@ -3,6 +3,7 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
+using NightInjection.Installation;
 
 namespace NightInjection.Setup;
 
@@ -69,6 +70,7 @@ internal static class Program
 
     private static int Install()
     {
+        SteamWorkerControl.StopForUpgrade(Path.Combine(InstallRoot, AppExecutable));
         if (IsApplicationRunning())
         {
             ShowMessage(
@@ -94,7 +96,7 @@ internal static class Program
         return wizard.ExitCode;
     }
 
-    private static void InstallFiles(bool createDesktopShortcut)
+    private static void InstallFiles(bool createDesktopShortcut, bool enableSteamBridge, string steamPath)
     {
         var parent = Directory.GetParent(InstallRoot)!.FullName;
         Directory.CreateDirectory(parent);
@@ -107,6 +109,8 @@ internal static class Program
         {
             Directory.CreateDirectory(staging);
             ExtractPayload(staging);
+            // Preflight the actual bundled bridge before replacing the installed app.
+            SteamBridgeDeployment.ValidatePayloadFile(Path.Combine(staging, "steam-bridge", SteamBridgeDeployment.FileName));
             var stagedExecutable = Path.Combine(staging, AppExecutable);
             if (!File.Exists(stagedExecutable))
             {
@@ -114,6 +118,8 @@ internal static class Program
             }
 
             ExtractUninstaller(Path.Combine(staging, UninstallerExecutable));
+            var oldReceipt = Path.Combine(InstallRoot, SteamBridgeDeployment.ReceiptName);
+            if (File.Exists(oldReceipt)) File.Copy(oldReceipt, Path.Combine(staging, SteamBridgeDeployment.ReceiptName));
             if (Directory.Exists(InstallRoot))
             {
                 Directory.Move(InstallRoot, backup);
@@ -123,6 +129,10 @@ internal static class Program
             Directory.Move(staging, InstallRoot);
             installedNew = true;
             ConfigureInstallation(createDesktopShortcut);
+            if (enableSteamBridge)
+                SteamBridgeDeployment.Install(Path.Combine(InstallRoot, "steam-bridge", SteamBridgeDeployment.FileName), steamPath, InstallRoot);
+            else
+                SteamBridgeDeployment.Remove(InstallRoot);
 
             if (movedExisting)
             {
@@ -162,6 +172,16 @@ internal static class Program
         if (!payloadIsValid)
         {
             return false;
+        }
+
+        var bridge = archive.Entries.SingleOrDefault(static entry =>
+            entry.FullName.Replace('\\', '/').Equals($"steam-bridge/{SteamBridgeDeployment.FileName}", StringComparison.Ordinal));
+        if (bridge is null || bridge.Length > SteamBridgeDeployment.MaximumPayloadBytes) return false;
+        using (var input = bridge.Open())
+        using (var buffer = new MemoryStream())
+        {
+            input.CopyTo(buffer);
+            SteamBridgeDeployment.ValidatePayload(buffer.ToArray());
         }
 
         var shortcutProbe = Path.Combine(Path.GetTempPath(), $"NightInjection-shortcut-{Guid.NewGuid():N}.lnk");
@@ -251,7 +271,7 @@ internal static class Program
         using var key = Registry.CurrentUser.CreateSubKey(UninstallRegistryKey, writable: true)
             ?? throw new InvalidOperationException("Could not create the uninstall registration.");
         key.SetValue("DisplayName", ProductName);
-        key.SetValue("DisplayVersion", "1.1.0");
+        key.SetValue("DisplayVersion", "2.0.2");
         key.SetValue("Publisher", "Night Injection");
         key.SetValue("InstallLocation", InstallRoot);
         key.SetValue("DisplayIcon", $"\"{executable}\",0");
@@ -293,6 +313,19 @@ internal static class Program
         new[] { "NightInjection", "NightInjection.UI" }
             .SelectMany(Process.GetProcessesByName)
             .Any(static process => process.Id != Environment.ProcessId);
+
+    internal static string DetectSteamPath()
+    {
+        foreach (var hive in new[] { Registry.CurrentUser, Registry.LocalMachine })
+        foreach (var name in new[] { @"Software\Valve\Steam", @"Software\WOW6432Node\Valve\Steam" })
+        {
+            using var key = hive.OpenSubKey(name);
+            foreach (var value in new[] { "SteamPath", "InstallPath" })
+                if (key?.GetValue(value) is string path && File.Exists(Path.Combine(path, "steam.exe")))
+                    return Path.GetFullPath(path);
+        }
+        return string.Empty;
+    }
 
     private static void ShowMessage(string title, string content, bool error = false) =>
         NativeMethods.MessageBox(IntPtr.Zero, content, title, 0x00000000u | (error ? 0x00000010u : 0x00000040u));

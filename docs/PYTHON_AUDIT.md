@@ -1,6 +1,6 @@
 # Python repository audit
 
-Audit source: `C:\Users\devil\Documents\night-injection-main`. All tracked source, tests, scripts, configuration, and assets were inspected before the native implementation was created.
+Audit source: the provided Night Injection project. All source, tests, scripts, configuration, and assets were inspected before the native implementation was created.
 
 ## 1. Current architecture map
 

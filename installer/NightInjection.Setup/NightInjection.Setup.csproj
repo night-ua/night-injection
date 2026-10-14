@@ -22,7 +22,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <DebugType>none</DebugType>
-    <Version>1.1.0</Version>
+    <Version>2.0.2</Version>
     <Product>Night Injection Setup</Product>
     <Company>Night Injection</Company>
     <Description>Per-user installer for Night Injection</Description>
@@ -31,6 +31,10 @@
 
   <ItemGroup Condition="'$(InstallerPayload)' != ''">
     <EmbeddedResource Include="$(InstallerPayload)" LogicalName="NightInjection.Payload.zip" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\Shared\SteamBridgeDeployment.cs" Link="SteamBridgeDeployment.cs" />
+    <Compile Include="..\Shared\SteamWorkerControl.cs" Link="SteamWorkerControl.cs" />
   </ItemGroup>
   <ItemGroup Condition="'$(UninstallerPayload)' != ''">
     <EmbeddedResource Include="$(UninstallerPayload)" LogicalName="NightInjection.Uninstaller.exe" />

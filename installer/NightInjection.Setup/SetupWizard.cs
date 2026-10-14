@@ -1,5 +1,7 @@
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
+using NightInjection.Installation;
 
 namespace NightInjection.Setup;
 
@@ -13,7 +15,9 @@ internal sealed class SetupWizard : Form
     private static readonly Color Success = Color.FromArgb(93, 207, 143);
     private static readonly Color Danger = Color.FromArgb(239, 113, 122);
 
-    private readonly Action<bool> _installAction;
+    private readonly Action<bool, bool, string> _installAction;
+    private readonly CheckBox _steamIntegration = new();
+    private readonly TextBox _steamPath = new();
     private readonly Panel _content = new();
     private readonly Button _backButton = new();
     private readonly Button _nextButton = new();
@@ -29,7 +33,7 @@ internal sealed class SetupWizard : Form
     private bool _installing;
     private bool _installationFailed;
 
-    public SetupWizard(string installRoot, Action<bool> installAction)
+    public SetupWizard(string installRoot, Action<bool, bool, string> installAction)
     {
         _installAction = installAction;
         Text = "Night Injection Setup";
@@ -178,7 +182,7 @@ internal sealed class SetupWizard : Form
 
     internal static bool VerifyLayout(string installRoot)
     {
-        using var wizard = new SetupWizard(installRoot, _ => { })
+        using var wizard = new SetupWizard(installRoot, (_, _, _) => { })
         {
             Opacity = 0,
             ShowInTaskbar = false
@@ -297,14 +301,26 @@ internal sealed class SetupWizard : Form
         _desktopShortcut.Location = new Point(0, 218);
         page.Controls.Add(_desktopShortcut);
 
-        var note = NewCard(new Point(0, 278), new Size(470, 76));
-        note.Controls.Add(NewParagraph(
-            "Your existing installation is safely backed up while the update is applied.",
-            18,
-            16,
-            430,
-            44));
-        page.Controls.Add(note);
+        _steamIntegration.Text = "Enable DarkDevil Steam Integration";
+        _steamIntegration.AutoSize = true;
+        _steamIntegration.Font = new Font("Segoe UI", 10);
+        _steamIntegration.ForeColor = TextPrimary;
+        _steamIntegration.Location = new Point(0, 252);
+        _steamIntegration.Checked = File.Exists(Path.Combine(installRoot, SteamBridgeDeployment.ReceiptName));
+        page.Controls.Add(_steamIntegration);
+        _steamPath.Text = Program.DetectSteamPath();
+        _steamPath.Location = new Point(0, 286);
+        _steamPath.Size = new Size(390, 30);
+        _steamPath.BackColor = SurfaceRaised;
+        _steamPath.ForeColor = TextPrimary;
+        page.Controls.Add(_steamPath);
+        var browse = new Button { Text = "Browse", Location = new Point(396, 284), Size = new Size(74, 30) };
+        browse.Click += (_, _) => {
+            using var picker = new FolderBrowserDialog { Description = "Select the Steam installation folder" };
+            if (picker.ShowDialog(this) == DialogResult.OK) _steamPath.Text = picker.SelectedPath;
+        };
+        page.Controls.Add(browse);
+        page.Controls.Add(NewParagraph("Requires Millennium with Starlight support. Restart Steam after installation, then enable the bridge in Millennium settings.", 0, 326, 470, 48));
         return page;
     }
 
@@ -415,6 +431,17 @@ internal sealed class SetupWizard : Form
     private async Task RunInstallationAsync()
     {
         var createDesktopShortcut = _desktopShortcut.Checked;
+        var enableSteamBridge = _steamIntegration.Checked;
+        var steamPath = _steamPath.Text.Trim();
+        if (enableSteamBridge && !SteamBridgeDeployment.HasMillennium(steamPath))
+        {
+            var answer = MessageBox.Show(this,
+                "Millennium was not found in the selected Steam folder. Install it from its official guide, then retry Setup. Open the guide now? No dependency will be downloaded or run by Setup.",
+                "Millennium required", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+            if (answer == DialogResult.Yes)
+                Process.Start(new ProcessStartInfo("https://docs.steambrew.app/users/getting-started/installation") { UseShellExecute = true });
+            return;
+        }
         _installationFailed = false;
         _installing = true;
         ShowPage(2);
@@ -433,7 +460,7 @@ internal sealed class SetupWizard : Form
                 Marshal.ThrowExceptionForHR(result);
                 try
                 {
-                    _installAction(createDesktopShortcut);
+                    _installAction(createDesktopShortcut, enableSteamBridge, steamPath);
                 }
                 finally
                 {
